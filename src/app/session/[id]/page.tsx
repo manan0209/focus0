@@ -2,7 +2,7 @@
 
 import SessionView from '@/components/SessionView';
 import { StudySession, createNewSession, getSessionById } from '@/lib/session';
-import { PlaylistInfo, VideoInfo } from '@/lib/youtube';
+import { parseYouTubeUrlsAsync, PlaylistInfo, VideoInfo } from '@/lib/youtube';
 import { ArrowLeft, ExternalLink } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -13,6 +13,30 @@ interface SharedSession {
   videos: VideoInfo[];
   playlists: PlaylistInfo[];
   createdAt: string;
+}
+
+// Function to reconstruct session from source URLs
+async function reconstructSessionFromSourceUrls(sessionId: string, sourceUrls: string[]): Promise<StudySession> {
+  try {
+    // Use the existing parseYouTubeUrlsAsync function to process the URLs
+    const result = await parseYouTubeUrlsAsync(sourceUrls);
+    
+    // Create session with reconstructed data
+    const session = createNewSession(
+      'Shared Study Session',
+      result.videos,
+      result.playlists,
+      sourceUrls
+    );
+    
+    // Override the ID to maintain the shared session reference
+    session.id = `shared-${sessionId}`;
+    
+    return session;
+  } catch (error) {
+    console.error('Error reconstructing session from source URLs:', error);
+    throw new Error('Failed to reconstruct session from source URLs');
+  }
 }
 
 export default function SharedSessionPage() {
@@ -42,8 +66,30 @@ export default function SharedSessionPage() {
         }
 
         // If not found locally, try to load as a shared session from API
-        // Include data parameter from URL if present
+        // First check if it's a source URL session
         const urlParams = new URLSearchParams(window.location.search);
+        const sourcesParam = urlParams.get('sources');
+        
+        if (sourcesParam) {
+          // Handle source URL reconstruction
+          const sourceUrls = sourcesParam.split('|').filter(url => url.trim());
+          
+          try {
+            // Dynamically reconstruct the session from source URLs
+            const reconstructedSession = await reconstructSessionFromSourceUrls(sessionId, sourceUrls);
+            setSession(reconstructedSession);
+            setLoading(false);
+            return;
+          } catch (err) {
+            console.error('Error reconstructing session from source URLs:', err);
+            setError('Failed to load session from source URLs');
+            setLoading(false);
+            return;
+          }
+        }
+        
+        // Fallback to traditional session loading
+        // Include data parameter from URL if present
         const dataParam = urlParams.get('data');
         
         let apiUrl = `/api/sessions?id=${sessionId}`;

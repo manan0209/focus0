@@ -5,7 +5,7 @@ import { AlertCircle, CheckCircle, Link, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 interface VideoUrlInputProps {
-  onVideosAdded: (videos: VideoInfo[], playlists: PlaylistInfo[]) => void;
+  onVideosAdded: (videos: VideoInfo[], playlists: PlaylistInfo[], sourceUrls: string[]) => void;
   className?: string;
 }
 
@@ -54,7 +54,7 @@ export default function VideoUrlInput({ onVideosAdded, className = '' }: VideoUr
       if (videos.length > 0 || playlists.length > 0) {
         const totalItems = videos.length + playlists.reduce((acc, p) => acc + p.videos.length, 0);
         setSuccessCount(totalItems);
-        onVideosAdded(videos, playlists);
+        onVideosAdded(videos, playlists, urls); // Pass original URLs
         setUrlInput('');
         
         if (hasPlaylists) {

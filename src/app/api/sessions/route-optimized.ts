@@ -1,6 +1,6 @@
 import { PlaylistInfo, VideoInfo } from '@/lib/youtube';
 import { NextRequest, NextResponse } from 'next/server';
-import { gzipSync, gunzipSync } from 'zlib';
+import { gunzipSync, gzipSync } from 'zlib';
 
 // Simplified session type - only stores video collections for sharing
 interface SharedSession {

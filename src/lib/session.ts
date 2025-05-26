@@ -13,6 +13,7 @@ export interface StudySession {
   createdAt: string;
   videos: VideoInfo[];
   playlists: PlaylistInfo[];
+  sourceUrls?: string[]; // Original URLs provided by user for sharing efficiency
   currentVideoIndex: number;
   focusTime: number; // in seconds
   pomodoroSettings: PomodoroSettings;
@@ -31,7 +32,8 @@ const DEFAULT_POMODORO_SETTINGS: PomodoroSettings = {
 export function createNewSession(
   name: string,
   videos: VideoInfo[],
-  playlists: PlaylistInfo[]
+  playlists: PlaylistInfo[],
+  sourceUrls?: string[]
 ): StudySession {
   return {
     id: generateSessionId(),
@@ -39,6 +41,7 @@ export function createNewSession(
     createdAt: new Date().toISOString(),
     videos,
     playlists,
+    sourceUrls,
     currentVideoIndex: 0,
     focusTime: 0,
     pomodoroSettings: { ...DEFAULT_POMODORO_SETTINGS },

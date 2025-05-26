@@ -158,44 +158,78 @@ export default function SessionView({ session, onUpdateSession, onExit }: Sessio
     setIsSharing(true);
     
     try {
-      // Create shareable session via API
-      const response = await fetch('/api/sessions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: currentSession.name,
-          videos: currentSession.videos,
-          playlists: currentSession.playlists,
-        }),
-      });
+      // Use source URL API for ultra-efficient sharing if available
+      if (currentSession.sourceUrls && currentSession.sourceUrls.length > 0) {
+        const response = await fetch('/api/sessions/source-urls', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: currentSession.name,
+            sourceUrls: currentSession.sourceUrls,
+          }),
+        });
 
-      
-      if (!response.ok) {
-        throw new Error(`Failed to create shareable session: ${response.status}`);
+        if (!response.ok) {
+          throw new Error(`Failed to create shareable session: ${response.status}`);
+        }
+
+        const result = await response.json();
+        const { shareUrl } = result;
+        setShareLink(shareUrl);
+        
+        // Auto-copy to clipboard immediately
+        await navigator.clipboard.writeText(shareUrl);
+        setCopySuccess(true);
+        
+        // No warnings needed for source URL approach
+        setSessionWarning(null);
+        setShowShareModal(true);
+        
+        // Reset copy success after 3 seconds but keep modal open
+        setTimeout(() => {
+          setCopySuccess(false);
+        }, 3000);
+      } else {
+        // Fallback to metadata API for sessions without source URLs
+        const response = await fetch('/api/sessions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: currentSession.name,
+            videos: currentSession.videos,
+            playlists: currentSession.playlists,
+          }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`Failed to create shareable session: ${response.status}`);
+        }
+
+        const result = await response.json();
+        
+        const { shareUrl, warning } = result;
+        setShareLink(shareUrl);
+        
+        // Keep track of any warnings from the server
+        const hasWarning = Boolean(warning);
+        
+        // Auto-copy to clipboard immediately
+        await navigator.clipboard.writeText(shareUrl);
+        setCopySuccess(true);
+        
+        // Store warning in state for display
+        setSessionWarning(hasWarning ? warning : null);
+        setShowShareModal(true);
+        
+        // Reset copy success after 3 seconds but keep modal open
+        setTimeout(() => {
+          setCopySuccess(false);
+        }, 3000);
       }
-
-      const result = await response.json();
-      
-      const { shareUrl, warning } = result;
-      setShareLink(shareUrl);
-      
-      // Keep track of any warnings from the server
-      const hasWarning = Boolean(warning);
-      
-      // Auto-copy to clipboard immediately
-      await navigator.clipboard.writeText(shareUrl);
-      setCopySuccess(true);
-      
-      // Store warning in state for display
-      setSessionWarning(hasWarning ? warning : null);
-      setShowShareModal(true);
-      
-      // Reset copy success after 3 seconds but keep modal open
-      setTimeout(() => {
-        setCopySuccess(false);
-      }, 3000);
       
     } catch (error) {
       alert(`Failed to share session: ${error instanceof Error ? error.message : 'Unknown error'}`);

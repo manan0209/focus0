@@ -14,6 +14,7 @@ export default function Home() {
   const [sessionName, setSessionName] = useState('');
   const [sessionVideos, setSessionVideos] = useState<VideoInfo[]>([]);
   const [sessionPlaylists, setSessionPlaylists] = useState<PlaylistInfo[]>([]);
+  const [sourceUrls, setSourceUrls] = useState<string[]>([]); // Track original URLs
   const [isSharing, setIsSharing] = useState(false);
   const [shareLink, setShareLink] = useState<string | null>(null);
   const [copySuccess, setCopySuccess] = useState(false);
@@ -22,9 +23,10 @@ export default function Home() {
     setSavedSessions(getSavedSessions());
   }, []);
 
-  const handleVideosAdded = (videos: VideoInfo[], playlists: PlaylistInfo[]) => {
+  const handleVideosAdded = (videos: VideoInfo[], playlists: PlaylistInfo[], urls: string[]) => {
     setSessionVideos(prev => [...prev, ...videos]);
     setSessionPlaylists(prev => [...prev, ...playlists]);
+    setSourceUrls(prev => [...prev, ...urls]);
     
     // Track video additions
     videos.forEach(() => analytics.videoAdded('single'));
@@ -36,7 +38,7 @@ export default function Home() {
       return;
     }
 
-    const session = createNewSession(sessionName.trim(), sessionVideos, sessionPlaylists);
+    const session = createNewSession(sessionName.trim(), sessionVideos, sessionPlaylists, sourceUrls);
     setCurrentSession(session);
     
     // Track session creation
@@ -74,6 +76,7 @@ export default function Home() {
     setSessionName('');
     setSessionVideos([]);
     setSessionPlaylists([]);
+    setSourceUrls([]);
     setShareLink(null);
     setCopySuccess(false);
   };
@@ -86,15 +89,15 @@ export default function Home() {
     setIsSharing(true);
     
     try {
-      const response = await fetch('/api/sessions', {
+      // Use source URL API for ultra-efficient sharing
+      const response = await fetch('/api/sessions/source-urls', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           name: sessionName.trim() || 'Shared Study Session',
-          videos: sessionVideos,
-          playlists: sessionPlaylists,
+          sourceUrls: sourceUrls,
         }),
       });
 
@@ -102,8 +105,7 @@ export default function Home() {
         throw new Error('Failed to create shareable session');
       }
 
-      const { sessionId } = await response.json();
-      const shareUrl = `${window.location.origin}/session/${sessionId}`;
+      const { shareUrl } = await response.json();
       setShareLink(shareUrl);
     } catch (error) {
       console.error('Error sharing session:', error);
