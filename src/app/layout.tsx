@@ -1,5 +1,5 @@
 import StructuredData from '@/components/StructuredData';
-import { Analytics } from '@vercel/analytics/react';
+import { Analytics } from "@vercel/analytics/next";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL('https://focus0.vercel.app'), // Update with your actual domain
+  metadataBase: new URL('https://focusmnn.vercel.app'), // Update with your actual domain
   title: {
     default: "Focus0 - YouTube Study Tool | Distraction-Free Learning",
     template: "%s | Focus0"
@@ -39,7 +39,7 @@ export const metadata: Metadata = {
     description: "Transform YouTube into a laser-focused study tool with distraction-free video experience, focus tracking, and Pomodoro timer integration.",
     type: "website",
     locale: "en_US",
-    url: "https://focus0.vercel.app",
+    url: "https://focusmnn.vercel.app",
     siteName: "Focus0",
     images: [
       {
@@ -75,7 +75,7 @@ export const metadata: Metadata = {
   
   // Additional SEO metadata
   alternates: {
-    canonical: "https://focus0.vercel.app",
+    canonical: "https://focusmnn.vercel.app",
   },
   
   // App-specific metadata

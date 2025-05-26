@@ -5,7 +5,7 @@ export default function StructuredData() {
     "@type": "WebApplication",
     "name": "Focus0 - YouTube Study Tool",
     "description": "Transform YouTube into a laser-focused study tool with distraction-free video experience and Pomodoro timer.",
-    "url": "https://focus0.vercel.app",
+    "url": "https://focusmnn.vercel.app",
     "applicationCategory": "EducationalApplication",
     "operatingSystem": "Web Browser",
     "offers": {

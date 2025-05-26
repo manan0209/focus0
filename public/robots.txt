@@ -3,7 +3,7 @@ Allow: /
 
 # Allow all crawlers to access all content
 # Sitemap location
-Sitemap: https://focus0.vercel.app/sitemap.xml
+Sitemap: https://focusmnn.vercel.app/sitemap.xml
 
 # Crawl delay (optional, helps with server load)
 Crawl-delay: 1
