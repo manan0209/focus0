@@ -1,6 +1,6 @@
 'use client';
 
-import { parseYouTubeUrls, PlaylistInfo, VideoInfo } from '@/lib/youtube';
+import { parseYouTubeUrls, parseYouTubeUrlsAsync, PlaylistInfo, VideoInfo } from '@/lib/youtube';
 import { AlertCircle, CheckCircle, Link, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -14,6 +14,7 @@ export default function VideoUrlInput({ onVideosAdded, className = '' }: VideoUr
   const [isProcessing, setIsProcessing] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
   const [successCount, setSuccessCount] = useState(0);
+  const [loadingMessage, setLoadingMessage] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,6 +24,7 @@ export default function VideoUrlInput({ onVideosAdded, className = '' }: VideoUr
     setIsProcessing(true);
     setErrors([]);
     setSuccessCount(0);
+    setLoadingMessage('Processing URLs...');
 
     try {
       const urls = urlInput
@@ -30,22 +32,41 @@ export default function VideoUrlInput({ onVideosAdded, className = '' }: VideoUr
         .map(url => url.trim())
         .filter(url => url.length > 0);
 
-      const { videos, playlists, errors: parseErrors } = parseYouTubeUrls(urls);
+      // Check if any URLs contain playlists
+      const hasPlaylists = urls.some(url => url.includes('list='));
+      
+      let result;
+      if (hasPlaylists) {
+        setLoadingMessage('Fetching playlist data from YouTube...');
+        // Use async function for real playlist data
+        result = await parseYouTubeUrlsAsync(urls);
+      } else {
+        // Use sync function for individual videos
+        result = parseYouTubeUrls(urls);
+      }
+
+      const { videos, playlists, errors: parseErrors } = result;
 
       if (parseErrors.length > 0) {
         setErrors(parseErrors);
       }
 
       if (videos.length > 0 || playlists.length > 0) {
-        setSuccessCount(videos.length + playlists.length);
+        const totalItems = videos.length + playlists.reduce((acc, p) => acc + p.videos.length, 0);
+        setSuccessCount(totalItems);
         onVideosAdded(videos, playlists);
         setUrlInput('');
+        
+        if (hasPlaylists) {
+          setLoadingMessage('✅ Successfully loaded real playlist content!');
+        }
       }
     } catch (error) {
       console.error('Error processing URLs:', error);
-      setErrors(['An error occurred while processing URLs']);
+      setErrors(['An error occurred while processing URLs. Please check your YouTube API key configuration.']);
     } finally {
       setIsProcessing(false);
+      setTimeout(() => setLoadingMessage(''), 3000);
     }
   };
 
@@ -53,6 +74,7 @@ export default function VideoUrlInput({ onVideosAdded, className = '' }: VideoUr
     setUrlInput('');
     setErrors([]);
     setSuccessCount(0);
+    setLoadingMessage('');
   };
 
   const pasteFromClipboard = async () => {
@@ -110,7 +132,7 @@ https://youtube.com/playlist?list=PLrAXtmRdnEQy6nuLMHjMZU6NoQW2i1x71`}
             {isProcessing ? (
               <>
                 <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                Processing...
+                {loadingMessage || 'Processing...'}
               </>
             ) : (
               <>
@@ -129,6 +151,14 @@ https://youtube.com/playlist?list=PLrAXtmRdnEQy6nuLMHjMZU6NoQW2i1x71`}
           </button>
         </div>
       </form>
+
+      {/* Loading Message */}
+      {loadingMessage && !isProcessing && (
+        <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg flex items-center gap-2">
+          <CheckCircle className="text-blue-400" size={16} />
+          <span className="text-blue-400 text-sm">{loadingMessage}</span>
+        </div>
+      )}
 
       {/* Success Message */}
       {successCount > 0 && (
@@ -157,9 +187,14 @@ https://youtube.com/playlist?list=PLrAXtmRdnEQy6nuLMHjMZU6NoQW2i1x71`}
         <h4 className="text-blue-400 font-medium text-sm mb-1">Supported formats:</h4>
         <ul className="text-blue-300 text-xs space-y-1">
           <li>• Individual videos: youtube.com/watch?v=... or youtu.be/...</li>
-          <li>• Playlists: youtube.com/playlist?list=...</li>
+          <li>• Playlists: youtube.com/playlist?list=... (requires YouTube API key)</li>
           <li>• Multiple URLs: One per line</li>
         </ul>
+        <div className="mt-2 pt-2 border-t border-blue-500/20">
+          <p className="text-blue-300 text-xs">
+            💡 <strong>Playlist Support:</strong> For real playlist content, add your YouTube API key to <code className="bg-blue-500/20 px-1 rounded">.env.local</code>
+          </p>
+        </div>
       </div>
     </div>
   );

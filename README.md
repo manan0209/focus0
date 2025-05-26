@@ -94,6 +94,33 @@ Focus0 is a next-generation web application that transforms YouTube into a laser
 4. **Open your browser**
    Navigate to [http://localhost:3000](http://localhost:3000)
 
+### YouTube API Configuration (Optional)
+
+For **real playlist content** instead of placeholder videos, configure the YouTube Data API:
+
+1. **Get a YouTube API Key**
+   - Visit [Google Cloud Console](https://console.developers.google.com/)
+   - Create a new project or select existing one
+   - Enable "YouTube Data API v3"
+   - Create credentials (API Key)
+   - Restrict the key to YouTube Data API v3 (recommended)
+
+2. **Configure Environment Variables**
+   ```bash
+   # Create .env.local file in project root
+   cp .env.local.example .env.local
+   
+   # Add your API key
+   NEXT_PUBLIC_YOUTUBE_API_KEY=your_youtube_api_key_here
+   ```
+
+3. **Restart Development Server**
+   ```bash
+   npm run dev
+   ```
+
+**Note**: Without API configuration, playlists will show placeholder content. Individual videos work without API keys.
+
 ### Building for Production
 
 ```bash

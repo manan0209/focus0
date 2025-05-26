@@ -11,6 +11,7 @@ interface VideoPlayerProps {
   onVideoEnd: () => void;
   onVideoChange: (index: number) => void;
   onTimeUpdate?: (currentTime: number, duration: number) => void;
+  onTitleUpdate?: (title: string, videoIndex: number) => void;
   className?: string;
 }
 
@@ -20,6 +21,7 @@ export default function VideoPlayer({
   onVideoEnd,
   onVideoChange,
   onTimeUpdate,
+  onTitleUpdate,
   className = ''
 }: VideoPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -61,7 +63,19 @@ export default function VideoPlayer({
     const videoDuration = event.target.getDuration();
     setDuration(videoDuration);
     setIsLoading(false);
-  }, []);
+    
+    // Fetch video title from YouTube API
+    if (onTitleUpdate && currentVideo) {
+      try {
+        const videoData = event.target.getVideoData();
+        if (videoData && videoData.title) {
+          onTitleUpdate(videoData.title, currentIndex);
+        }
+      } catch (error) {
+        console.warn('Failed to fetch video title:', error);
+      }
+    }
+  }, [onTitleUpdate, currentVideo, currentIndex]);
 
   const onPlay = useCallback(() => {
     setIsPlaying(true);

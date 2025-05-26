@@ -2,8 +2,8 @@
 
 import { useWindowFocus } from '@/hooks/useWindowFocus';
 import { PomodoroSettings, saveSession, StudySession } from '@/lib/session';
-import { Clock, Home, Share2, Target, GripVertical } from 'lucide-react';
-import { useCallback, useEffect, useState, useRef } from 'react';
+import { Clock, GripVertical, Home, Share2, Target } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import UnifiedProgress from './UnifiedProgress';
 import VideoPlayer from './VideoPlayer';
 
@@ -18,14 +18,28 @@ export default function SessionView({ session, onUpdateSession, onExit }: Sessio
   const [showShareModal, setShowShareModal] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(384); // Default 24rem = 384px
   const [isResizing, setIsResizing] = useState(false);
+  const [isLargeScreen, setIsLargeScreen] = useState(false);
   const resizeRef = useRef<HTMLDivElement>(null);
   const { isWindowFocused, totalFocusTime } = useWindowFocus();
 
-  // Combine videos from individual videos and playlists
-  const allVideos = [
+  // Handle screen size changes
+  useEffect(() => {
+    const handleResize = () => {
+      setIsLargeScreen(window.innerWidth > 1024);
+    };
+
+    // Set initial value
+    handleResize();
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Combine videos from individual videos and playlists (memoized to prevent unnecessary re-renders)
+  const allVideos = useMemo(() => [
     ...currentSession.videos,
     ...currentSession.playlists.flatMap(p => p.videos)
-  ];
+  ], [currentSession.videos, currentSession.playlists]);
 
   const updateSession = useCallback((updates: Partial<StudySession>) => {
     const updatedSession = { ...currentSession, ...updates };
@@ -74,9 +88,10 @@ export default function SessionView({ session, onUpdateSession, onExit }: Sessio
     const handleMouseMove = (e: MouseEvent) => {
       if (!isResizing) return;
       
-      const newWidth = window.innerWidth - e.clientX;
+      const containerWidth = window.innerWidth;
+      const newWidth = containerWidth - e.clientX;
       const minWidth = 280; // Minimum sidebar width
-      const maxWidth = Math.min(600, window.innerWidth * 0.4); // Max 40% of screen width
+      const maxWidth = Math.min(600, containerWidth * 0.4); // Max 40% of screen width
       
       setSidebarWidth(Math.max(minWidth, Math.min(maxWidth, newWidth)));
     };
@@ -234,10 +249,10 @@ export default function SessionView({ session, onUpdateSession, onExit }: Sessio
       <div className="flex h-[calc(100vh-73px)] relative">
         {/* Main Video Area */}
         <div 
-          className="flex-1 p-3 lg:p-4 xl:p-6 min-h-0"
-          style={{ 
-            width: window.innerWidth > 1024 ? `calc(100% - ${sidebarWidth}px)` : '100%'
-          }}
+          className={`flex-1 p-3 lg:p-4 xl:p-6 min-h-0 ${isLargeScreen ? 'pr-0' : ''}`}
+          style={isLargeScreen ? { 
+            width: `calc(100% - ${sidebarWidth}px)` 
+          } : undefined}
         >
           <VideoPlayer
             videos={allVideos}
@@ -250,7 +265,7 @@ export default function SessionView({ session, onUpdateSession, onExit }: Sessio
         </div>
 
         {/* Desktop Sidebar with Resize Handle */}
-        {typeof window !== 'undefined' && window.innerWidth > 1024 && (
+        {isLargeScreen && (
           <>
             {/* Resize Handle */}
             <div
@@ -258,7 +273,7 @@ export default function SessionView({ session, onUpdateSession, onExit }: Sessio
               onMouseDown={startResize}
               className={`w-1 bg-gray-600 hover:bg-gray-500 cursor-col-resize transition-colors ${
                 isResizing ? 'bg-blue-500' : ''
-              } flex items-center justify-center group`}
+              } flex items-center justify-center group relative z-10`}
               style={{ minHeight: '100%' }}
             >
               <div className="opacity-0 group-hover:opacity-100 transition-opacity">
@@ -268,7 +283,7 @@ export default function SessionView({ session, onUpdateSession, onExit }: Sessio
 
             {/* Sidebar */}
             <div 
-              className="bg-gray-900/50 backdrop-blur-sm border-l border-gray-700 overflow-y-auto"
+              className="bg-gray-900/50 backdrop-blur-sm border-l border-gray-700 overflow-y-auto flex-shrink-0"
               style={{ 
                 width: `${sidebarWidth}px`,
                 minWidth: '280px',
@@ -351,7 +366,7 @@ export default function SessionView({ session, onUpdateSession, onExit }: Sessio
         )}
 
         {/* Mobile Sidebar (Bottom Sheet Style) */}
-        {typeof window !== 'undefined' && window.innerWidth <= 1024 && (
+        {!isLargeScreen && (
           <div className="fixed bottom-0 left-0 right-0 bg-gray-900/95 backdrop-blur-sm border-t border-gray-700 p-4 max-h-[50vh] overflow-y-auto">
             <div className="flex gap-4 overflow-x-auto">
               {/* Unified Progress (Focus + Timer) */}

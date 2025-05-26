@@ -102,8 +102,8 @@ export default function UnifiedProgress({
   const strokeDashoffset = circumference - (progress / 100) * circumference;
 
   const SettingsModal = () => (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-      <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 max-w-md w-full mx-4">
+    <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 rounded-lg">
+      <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 max-w-sm w-full mx-4 max-h-[90%] overflow-y-auto">
         <h3 className="text-lg font-semibold text-white mb-4">Pomodoro Settings</h3>
         
         <div className="space-y-4">
@@ -187,7 +187,7 @@ export default function UnifiedProgress({
   );
 
   return (
-    <div className={`bg-gray-900/95 backdrop-blur-sm border border-gray-700 rounded-lg p-4 ${className}`}>
+    <div className={`bg-gray-900/95 backdrop-blur-sm border border-gray-700 rounded-lg p-4 relative ${className}`}>
       {/* Header with Focus Status */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-3">
