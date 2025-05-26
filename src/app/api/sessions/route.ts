@@ -1,7 +1,5 @@
 import { PlaylistInfo, VideoInfo } from '@/lib/youtube';
-import fs from 'fs';
 import { NextRequest, NextResponse } from 'next/server';
-import path from 'path';
 
 // Simplified session type - only stores video collections for sharing
 interface SharedSession {
@@ -10,38 +8,11 @@ interface SharedSession {
   videos: VideoInfo[];
   playlists: PlaylistInfo[];
   createdAt: number;
-  expiresAt: number; // 30 days from creation
 }
 
-// File-based storage for development persistence
-const SESSIONS_FILE = path.join(process.cwd(), '.sessions-storage.json');
-
-// Load sessions from file or create empty map
-function loadSessions(): Map<string, SharedSession> {
-  try {
-    if (fs.existsSync(SESSIONS_FILE)) {
-      const data = fs.readFileSync(SESSIONS_FILE, 'utf-8');
-      const sessionsObj = JSON.parse(data);
-      return new Map(Object.entries(sessionsObj));
-    }
-  } catch (error) {
-    console.warn('Error loading sessions file:', error);
-  }
-  return new Map();
-}
-
-// Save sessions to file
-function saveSessions(sessions: Map<string, SharedSession>) {
-  try {
-    const sessionsObj = Object.fromEntries(sessions);
-    fs.writeFileSync(SESSIONS_FILE, JSON.stringify(sessionsObj, null, 2));
-  } catch (error) {
-    console.error('Error saving sessions file:', error);
-  }
-}
-
-// Load sessions on startup
-const sessions = loadSessions();
+// In-memory storage for serverless compatibility
+// Note: This resets between function invocations, but we'll use URL encoding as backup
+const sessions = new Map<string, SharedSession>();
 
 // Generate a short, URL-friendly ID
 function generateSessionId(): string {
@@ -53,18 +24,25 @@ function generateSessionId(): string {
   return result;
 }
 
-// Clean up expired sessions and save to file
-function cleanupExpiredSessions() {
-  const now = Date.now();
-  let hasChanges = false;
-  for (const [id, session] of sessions.entries()) {
-    if (session.expiresAt < now) {
-      sessions.delete(id);
-      hasChanges = true;
-    }
+// Encode session data into URL-safe base64
+function encodeSessionData(session: Omit<SharedSession, 'id'>): string {
+  try {
+    const jsonString = JSON.stringify(session);
+    return Buffer.from(jsonString).toString('base64url');
+  } catch (error) {
+    console.error('Error encoding session data:', error);
+    throw new Error('Failed to encode session data');
   }
-  if (hasChanges) {
-    saveSessions(sessions);
+}
+
+// Decode session data from URL-safe base64
+function decodeSessionData(encodedData: string): Omit<SharedSession, 'id'> | null {
+  try {
+    const jsonString = Buffer.from(encodedData, 'base64url').toString('utf-8');
+    return JSON.parse(jsonString);
+  } catch (error) {
+    console.error('Error decoding session data:', error);
+    return null;
   }
 }
 
@@ -126,30 +104,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    cleanupExpiredSessions();
-
     const sessionId = generateSessionId();
     const now = Date.now();
-    const thirtyDays = 30 * 24 * 60 * 60 * 1000; // 30 days in milliseconds
 
-    const session: SharedSession = {
-      id: sessionId,
+    const sessionData = {
       name: name || `Study Session`,
       videos: videos || [],
       playlists: playlists || [],
-      createdAt: now,
-      expiresAt: now + thirtyDays
+      createdAt: now
     };
 
+    const session: SharedSession = {
+      id: sessionId,
+      ...sessionData
+    };
+
+    // Store in memory (will persist for current serverless function lifetime)
     sessions.set(sessionId, session);
 
-    // Save to file for persistence
-    saveSessions(sessions);
+    // Create URL with encoded data as fallback
+    const encodedData = encodeSessionData(sessionData);
+    const shareUrlWithData = `${request.nextUrl.origin}/session/${sessionId}?data=${encodedData}`;
 
     return NextResponse.json({
       sessionId,
-      shareUrl: `${request.nextUrl.origin}/session/${sessionId}`,
-      expiresAt: session.expiresAt
+      shareUrl: shareUrlWithData
     });
 
   } catch (error) {
@@ -165,6 +144,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const sessionId = searchParams.get('id');
+    const encodedData = searchParams.get('data');
 
     if (!sessionId) {
       return NextResponse.json(
@@ -173,9 +153,19 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    cleanupExpiredSessions();
+    // First try to get from memory
+    let session = sessions.get(sessionId);
 
-    const session = sessions.get(sessionId);
+    // If not in memory, try to decode from URL data
+    if (!session && encodedData) {
+      const decodedData = decodeSessionData(encodedData);
+      if (decodedData) {
+        session = {
+          id: sessionId,
+          ...decodedData
+        };
+      }
+    }
 
     if (!session) {
       return NextResponse.json(
@@ -184,7 +174,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Return only the video collection, not any progress data
+    // Return the session data
     return NextResponse.json({
       id: session.id,
       name: session.name,

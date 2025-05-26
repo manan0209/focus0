@@ -42,7 +42,16 @@ export default function SharedSessionPage() {
         }
 
         // If not found locally, try to load as a shared session from API
-        const response = await fetch(`/api/sessions?id=${sessionId}`);
+        // Include data parameter from URL if present
+        const urlParams = new URLSearchParams(window.location.search);
+        const dataParam = urlParams.get('data');
+        
+        let apiUrl = `/api/sessions?id=${sessionId}`;
+        if (dataParam) {
+          apiUrl += `&data=${encodeURIComponent(dataParam)}`;
+        }
+        
+        const response = await fetch(apiUrl);
         if (response.ok) {
           const sharedSession: SharedSession = await response.json();
           
