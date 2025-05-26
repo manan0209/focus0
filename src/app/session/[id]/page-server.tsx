@@ -61,5 +61,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
 
 // Server component wrapper
 export default function SessionPage({ params }: { params: { id: string } }) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { id } = params; // Keep for future use with proper storage
   return <SharedSessionPage />;
 }
