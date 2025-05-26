@@ -17,6 +17,7 @@ export default function SessionView({ session, onUpdateSession, onExit }: Sessio
   const [currentSession, setCurrentSession] = useState(session);
   const [showShareModal, setShowShareModal] = useState(false);
   const [shareLink, setShareLink] = useState<string | null>(null);
+  const [sessionWarning, setSessionWarning] = useState<string | null>(null);
   const [isSharing, setIsSharing] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(384); // Default 24rem = 384px
@@ -177,12 +178,18 @@ export default function SessionView({ session, onUpdateSession, onExit }: Sessio
 
       const result = await response.json();
       
-      const { shareUrl } = result;
+      const { shareUrl, warning } = result;
       setShareLink(shareUrl);
+      
+      // Keep track of any warnings from the server
+      const hasWarning = Boolean(warning);
       
       // Auto-copy to clipboard immediately
       await navigator.clipboard.writeText(shareUrl);
       setCopySuccess(true);
+      
+      // Store warning in state for display
+      setSessionWarning(hasWarning ? warning : null);
       setShowShareModal(true);
       
       // Reset copy success after 3 seconds but keep modal open
@@ -554,6 +561,19 @@ export default function SessionView({ session, onUpdateSession, onExit }: Sessio
                   </div>
                 </div>
               </div>
+
+              {/* Warning Message (if applicable) */}
+              {sessionWarning && (
+                <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 text-yellow-400">⚠️</div>
+                    <div>
+                      <p className="text-yellow-400 font-medium">Sharing Notice</p>
+                      <p className="text-yellow-300/80 text-sm">{sessionWarning}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Session Info */}
               <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">

@@ -11,27 +11,67 @@ interface SharedSession {
   createdAt: number;
 }
 
-// Ultra-minimal data structure for maximum compression (using short keys)
-interface UltraMinimalVideoInfo {
-  i: string; // id
-  t?: string; // title (optional, truncated if too long)
+// Minimal data structure for URL encoding (only essential fields)
+interface MinimalVideoInfo {
+  id: string;
+  title?: string;
 }
 
-interface UltraMinimalPlaylistInfo {
-  i: string; // id
-  t?: string; // title (optional, truncated if too long)
-  v: UltraMinimalVideoInfo[]; // videos
+interface MinimalPlaylistInfo {
+  id: string;
+  title?: string;
+  videos: MinimalVideoInfo[];
 }
 
-interface UltraMinimalSession {
-  n: string; // name
-  v: UltraMinimalVideoInfo[]; // videos
-  p: UltraMinimalPlaylistInfo[]; // playlists
-  c: number; // createdAt
+interface MinimalSession {
+  name: string;
+  videos: MinimalVideoInfo[];
+  playlists: MinimalPlaylistInfo[];
+  createdAt: number;
 }
 
-// Simple in-memory storage (works for same serverless instance)
+// Enhanced in-memory storage with expiration
+const sessionStore = new Map<string, { data: SharedSession; expires: number }>();
+const SESSION_TTL = 24 * 60 * 60 * 1000; // 24 hours
+
+// Legacy in-memory storage (for compatibility)
 const sessions = new Map<string, SharedSession>();
+
+// Cleanup expired sessions
+const cleanupExpired = () => {
+  const now = Date.now();
+  for (const [key, value] of sessionStore.entries()) {
+    if (value.expires < now) {
+      sessionStore.delete(key);
+    }
+  }
+};
+
+// Enhanced storage methods
+const StorageManager = {
+  set(sessionId: string, data: SharedSession): void {
+    sessionStore.set(sessionId, {
+      data,
+      expires: Date.now() + SESSION_TTL
+    });
+  },
+
+  get(sessionId: string): SharedSession | null {
+    const stored = sessionStore.get(sessionId);
+    if (!stored) return null;
+    
+    if (stored.expires < Date.now()) {
+      sessionStore.delete(sessionId);
+      return null;
+    }
+    
+    return stored.data;
+  },
+
+  cleanup(): void {
+    cleanupExpired();
+  }
+};
 
 // Generate a short, URL-friendly ID
 function generateSessionId(): string {
@@ -43,54 +83,48 @@ function generateSessionId(): string {
   return result;
 }
 
-// Convert to ultra-minimal format with aggressive optimization
-function toUltraMinimal(session: Omit<SharedSession, 'id'>): UltraMinimalSession {
+// Convert full session to minimal format for URL encoding
+function toMinimalSession(session: Omit<SharedSession, 'id'>): MinimalSession {
   return {
-    n: session.name.length > 50 ? session.name.substring(0, 50) : session.name,
-    v: session.videos.map(v => ({ 
-      i: v.id, 
-      t: v.title && v.title.length > 10 && v.title.length < 80 ? v.title : undefined 
+    name: session.name,
+    videos: session.videos.map(v => ({ id: v.id, title: v.title })),
+    playlists: session.playlists.map(p => ({
+      id: p.id,
+      title: p.title,
+      videos: p.videos.map(v => ({ id: v.id, title: v.title }))
     })),
-    p: session.playlists.map(p => ({
-      i: p.id,
-      t: p.title && p.title.length > 10 && p.title.length < 80 ? p.title : undefined,
-      v: p.videos.slice(0, 50).map(v => ({ // Limit to 50 videos per playlist
-        i: v.id, 
-        t: v.title && v.title.length > 10 && v.title.length < 80 ? v.title : undefined 
-      }))
-    })),
-    c: session.createdAt
+    createdAt: session.createdAt
   };
 }
 
-// Convert back to full format
-function fromUltraMinimal(minimal: UltraMinimalSession): Omit<SharedSession, 'id'> {
+// Convert minimal session back to full format
+function fromMinimalSession(minimal: MinimalSession): Omit<SharedSession, 'id'> {
   return {
-    name: minimal.n,
-    videos: minimal.v.map(v => ({
-      id: v.i,
-      url: `https://www.youtube.com/watch?v=${v.i}`,
-      title: v.t || `Video ${v.i}`,
+    name: minimal.name,
+    videos: minimal.videos.map(v => ({
+      id: v.id,
+      url: `https://www.youtube.com/watch?v=${v.id}`,
+      title: v.title,
     })),
-    playlists: minimal.p.map(p => ({
-      id: p.i,
-      url: `https://www.youtube.com/playlist?list=${p.i}`,
-      title: p.t || `Playlist ${p.i}`,
-      videos: p.v.map(v => ({
-        id: v.i,
-        url: `https://www.youtube.com/watch?v=${v.i}`,
-        title: v.t || `Video ${v.i}`,
+    playlists: minimal.playlists.map(p => ({
+      id: p.id,
+      url: `https://www.youtube.com/playlist?list=${p.id}`,
+      title: p.title,
+      videos: p.videos.map(v => ({
+        id: v.id,
+        url: `https://www.youtube.com/watch?v=${v.id}`,
+        title: v.title,
       }))
     })),
-    createdAt: minimal.c
+    createdAt: minimal.createdAt
   };
 }
 
-// Encode with maximum compression for Vercel URLs
+// Encode session data with compression and base64
 function encodeSessionData(session: Omit<SharedSession, 'id'>): string {
   try {
-    const ultraMinimal = toUltraMinimal(session);
-    const jsonString = JSON.stringify(ultraMinimal);
+    const minimal = toMinimalSession(session);
+    const jsonString = JSON.stringify(minimal);
     const compressed = gzipSync(Buffer.from(jsonString, 'utf-8'));
     return compressed.toString('base64url');
   } catch (error) {
@@ -99,14 +133,14 @@ function encodeSessionData(session: Omit<SharedSession, 'id'>): string {
   }
 }
 
-// Decode compressed session data
+// Decode session data from compressed base64
 function decodeSessionData(encodedData: string): Omit<SharedSession, 'id'> | null {
   try {
     const compressed = Buffer.from(encodedData, 'base64url');
     const decompressed = gunzipSync(compressed);
     const jsonString = decompressed.toString('utf-8');
-    const ultraMinimal: UltraMinimalSession = JSON.parse(jsonString);
-    return fromUltraMinimal(ultraMinimal);
+    const minimal: MinimalSession = JSON.parse(jsonString);
+    return fromMinimalSession(minimal);
   } catch (error) {
     console.error('Error decoding session data:', error);
     return null;
@@ -133,7 +167,11 @@ export async function POST(request: NextRequest) {
              typeof video === 'object' &&
              video !== undefined &&
              'id' in video &&
-             typeof (video as VideoInfo).id === 'string';
+             'title' in video &&
+             'thumbnail' in video &&
+             typeof (video as VideoInfo).id === 'string' &&
+             typeof (video as VideoInfo).title === 'string' &&
+             typeof (video as VideoInfo).thumbnail === 'string';
     };
 
     // Validate playlist format
@@ -145,8 +183,10 @@ export async function POST(request: NextRequest) {
       const playlistObj = playlist as Record<string, unknown>;
       
       return 'id' in playlistObj &&
+             'title' in playlistObj &&
              'videos' in playlistObj &&
              typeof playlistObj.id === 'string' &&
+             typeof playlistObj.title === 'string' &&
              Array.isArray(playlistObj.videos) &&
              playlistObj.videos.every(isValidVideo);
     };
@@ -180,36 +220,29 @@ export async function POST(request: NextRequest) {
       ...sessionData
     };
 
-    // Store in memory (works for same serverless instance)
+    // Store in both systems for redundancy
     sessions.set(sessionId, session);
+    StorageManager.set(sessionId, session);
 
-    // Create compressed URL for Vercel deployment
+    // Try to create compressed URL with data
     let shareUrl = `${request.nextUrl.origin}/session/${sessionId}`;
     
     try {
       const encodedData = encodeSessionData(sessionData);
       
-      // Always try to include data in URL, but with length limits for very large sessions
-      if (encodedData.length < 1500) {
-        // Small sessions: include full data in URL
+      // Only include data in URL if it's reasonably sized (under 2000 chars to be safe)
+      if (encodedData.length < 2000) {
         shareUrl = `${request.nextUrl.origin}/session/${sessionId}?data=${encodedData}`;
-      } else if (encodedData.length < 3000) {
-        // Medium sessions: include data but warn user
-        shareUrl = `${request.nextUrl.origin}/session/${sessionId}?data=${encodedData}`;
-        console.log(`Session ${sessionId} has medium size (${encodedData.length} chars)`);
       } else {
-        // Large sessions: ID-only approach with warning
-        console.log(`Session ${sessionId} too large for reliable URL sharing (${encodedData.length} chars)`);
-        // Could implement chunking or alternative approach here
+        console.log(`Session ${sessionId} data too large for URL (${encodedData.length} chars), using ID-only approach`);
       }
     } catch (error) {
-      console.error('Error creating encoded URL:', error);
+      console.error('Error creating encoded URL, falling back to ID-only:', error);
     }
 
     return NextResponse.json({
       sessionId,
-      shareUrl,
-      warning: shareUrl.length > 2000 ? 'Session data is large; sharing may be unreliable on some platforms' : undefined
+      shareUrl
     });
 
   } catch (error) {
@@ -234,12 +267,18 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Try multiple storage sources in order of preference
     let session: SharedSession | null = null;
 
-    // Try in-memory storage first (same serverless instance)
+    // 1. Try in-memory storage first (fastest)
     session = sessions.get(sessionId) || null;
 
-    // If not in memory, decode from URL data (this is the main approach for Vercel)
+    // 2. Try persistent storage
+    if (!session) {
+      session = StorageManager.get(sessionId);
+    }
+
+    // 3. Try to decode from URL data as last resort
     if (!session && encodedData) {
       const decodedData = decodeSessionData(encodedData);
       if (decodedData) {
@@ -248,14 +287,15 @@ export async function GET(request: NextRequest) {
           ...decodedData
         };
         
-        // Store in memory for potential future requests in same instance
+        // Store the decoded session for future requests
         sessions.set(sessionId, session);
+        StorageManager.set(sessionId, session);
       }
     }
 
     if (!session) {
       return NextResponse.json(
-        { error: 'Session not found or expired. The session may have been too large to share reliably.' },
+        { error: 'Session not found or expired' },
         { status: 404 }
       );
     }
