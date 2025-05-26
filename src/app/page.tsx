@@ -1,103 +1,293 @@
-import Image from "next/image";
+'use client';
+
+import { useState, useEffect } from 'react';
+import { StudySession, createNewSession, getSavedSessions, deleteSession } from '@/lib/session';
+import { VideoInfo, PlaylistInfo } from '@/lib/youtube';
+import VideoUrlInput from '@/components/VideoUrlInput';
+import SessionView from '@/components/SessionView';
+import { Play, Trash2, Clock, Target, BookOpen, Github } from 'lucide-react';
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [currentSession, setCurrentSession] = useState<StudySession | null>(null);
+  const [savedSessions, setSavedSessions] = useState<StudySession[]>([]);
+  const [sessionName, setSessionName] = useState('');
+  const [sessionVideos, setSessionVideos] = useState<VideoInfo[]>([]);
+  const [sessionPlaylists, setSessionPlaylists] = useState<PlaylistInfo[]>([]);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+  useEffect(() => {
+    setSavedSessions(getSavedSessions());
+  }, []);
+
+  const handleVideosAdded = (videos: VideoInfo[], playlists: PlaylistInfo[]) => {
+    setSessionVideos(prev => [...prev, ...videos]);
+    setSessionPlaylists(prev => [...prev, ...playlists]);
+  };
+
+  const createSession = () => {
+    if (!sessionName.trim() || (sessionVideos.length === 0 && sessionPlaylists.length === 0)) {
+      return;
+    }
+
+    const session = createNewSession(sessionName.trim(), sessionVideos, sessionPlaylists);
+    setCurrentSession(session);
+  };
+
+  const loadSession = (session: StudySession) => {
+    setCurrentSession(session);
+  };
+
+  const handleSessionUpdate = (updatedSession: StudySession) => {
+    setCurrentSession(updatedSession);
+    setSavedSessions(prev => 
+      prev.map(s => s.id === updatedSession.id ? updatedSession : s)
+    );
+  };
+
+  const handleDeleteSession = (sessionId: string) => {
+    deleteSession(sessionId);
+    setSavedSessions(prev => prev.filter(s => s.id !== sessionId));
+  };
+
+  const exitSession = () => {
+    setCurrentSession(null);
+  };
+
+  const resetForm = () => {
+    setSessionName('');
+    setSessionVideos([]);
+    setSessionPlaylists([]);
+  };
+
+  const formatTime = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    
+    if (hours > 0) {
+      return `${hours}h ${mins}m`;
+    }
+    return `${mins}m`;
+  };
+
+  if (currentSession) {
+    return (
+      <SessionView
+        session={currentSession}
+        onUpdateSession={handleSessionUpdate}
+        onExit={exitSession}
+      />
+    );
+  }
+
+  const totalVideos = sessionVideos.length + sessionPlaylists.reduce((acc, p) => acc + p.videos.length, 0);
+
+  return (
+    <div className="min-h-screen bg-gray-950">
+      {/* Header */}
+      <header className="bg-gray-900/90 backdrop-blur-sm border-b border-gray-700">
+        <div className="max-w-6xl mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                <Target className="text-white" size={20} />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-white">Focus0</h1>
+                <p className="text-sm text-gray-400">YouTube Study Tool</p>
+              </div>
+            </div>
+            
+            <a
+              href="https://github.com/manan0209"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
+            >
+              <Github size={20} />
+              <span>GitHub</span>
+            </a>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      </header>
+
+      <div className="max-w-6xl mx-auto px-6 py-8">
+        <div className="grid lg:grid-cols-2 gap-8">
+          {/* Left Column - Create Session */}
+          <div className="space-y-6">
+            <div className="bg-gray-900/95 backdrop-blur-sm border border-gray-700 rounded-lg p-6">
+              <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+                <BookOpen size={24} />
+                Create New Session
+              </h2>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Session Name
+                  </label>
+                  <input
+                    type="text"
+                    value={sessionName}
+                    onChange={(e) => setSessionName(e.target.value)}
+                    placeholder="e.g., React Tutorial Marathon"
+                    className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-white placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+                  />
+                </div>
+
+                {/* Session Preview */}
+                {(sessionVideos.length > 0 || sessionPlaylists.length > 0) && (
+                  <div className="bg-gray-800/50 border border-gray-600 rounded-lg p-4">
+                    <h3 className="text-sm font-medium text-gray-300 mb-2">Session Preview</h3>
+                    <div className="text-sm text-gray-400 space-y-1">
+                      <div className="flex justify-between">
+                        <span>Videos:</span>
+                        <span>{totalVideos}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Playlists:</span>
+                        <span>{sessionPlaylists.length}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={createSession}
+                    disabled={!sessionName.trim() || totalVideos === 0}
+                    className="flex-1 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Play size={18} />
+                    Start Session
+                  </button>
+                  
+                  {(sessionVideos.length > 0 || sessionPlaylists.length > 0 || sessionName) && (
+                    <button
+                      onClick={resetForm}
+                      className="px-4 py-2 border border-gray-600 text-gray-300 hover:text-white hover:border-gray-500 rounded-lg transition-colors"
+                    >
+                      Reset
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <VideoUrlInput onVideosAdded={handleVideosAdded} />
+          </div>
+
+          {/* Right Column - Saved Sessions */}
+          <div className="space-y-6">
+            <div className="bg-gray-900/95 backdrop-blur-sm border border-gray-700 rounded-lg p-6">
+              <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
+                <Clock size={24} />
+                Saved Sessions
+              </h2>
+
+              {savedSessions.length === 0 ? (
+                <div className="text-center py-8">
+                  <div className="text-4xl mb-2">📚</div>
+                  <p className="text-gray-400">No saved sessions yet</p>
+                  <p className="text-sm text-gray-500 mt-1">
+                    Create your first focused study session above
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                  {savedSessions.map((session) => {
+                    const totalVideos = session.videos.length + session.playlists.reduce((acc, p) => acc + p.videos.length, 0);
+                    
+                    return (
+                      <div
+                        key={session.id}
+                        className="bg-gray-800/50 border border-gray-600 rounded-lg p-4 hover:border-gray-500 transition-colors"
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1">
+                            <h3 className="font-medium text-white truncate">{session.name}</h3>
+                            <p className="text-xs text-gray-400">
+                              Created {new Date(session.createdAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                          
+                          <button
+                            onClick={() => handleDeleteSession(session.id)}
+                            className="text-gray-400 hover:text-red-400 p-1 transition-colors"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 text-xs text-gray-400 mb-3">
+                          <div className="flex justify-between">
+                            <span>Videos:</span>
+                            <span>{totalVideos}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>Focus Time:</span>
+                            <span>{formatTime(session.focusTime)}</span>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => loadSession(session)}
+                          className="w-full bg-blue-500/20 hover:bg-blue-500/30 text-blue-400 font-medium py-2 px-4 rounded transition-colors flex items-center justify-center gap-2"
+                        >
+                          <Play size={16} />
+                          Resume Session
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Features Overview */}
+            <div className="bg-gray-900/95 backdrop-blur-sm border border-gray-700 rounded-lg p-6">
+              <h3 className="text-lg font-semibold text-white mb-4">✨ Features</h3>
+              <ul className="space-y-2 text-sm text-gray-300">
+                <li className="flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 bg-blue-500 rounded-full"></div>
+                  Distraction-free YouTube player
+                </li>
+                <li className="flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
+                  Focus tracking with window detection
+                </li>
+                <li className="flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 bg-purple-500 rounded-full"></div>
+                  Built-in Pomodoro timer
+                </li>
+                <li className="flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 bg-yellow-500 rounded-full"></div>
+                  Session sharing & persistence
+                </li>
+                <li className="flex items-center gap-2">
+                  <div className="w-1.5 h-1.5 bg-red-500 rounded-full"></div>
+                  Support for videos & playlists
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        
+        {/* Footer Attribution */}
+        <footer className="mt-12 pt-8 border-t border-gray-800">
+          <div className="text-center">
+            <p className="text-gray-400 text-sm">
+              Made with ❤️ by{' '}
+              <a 
+                href="https://github.com/manan0209" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-blue-400 hover:text-blue-300 transition-colors"
+              >
+                devmnn
+              </a>
+            </p>
+          </div>
+        </footer>
+      </div>
     </div>
   );
 }
