@@ -4,7 +4,7 @@ import SessionView from '@/components/SessionView';
 import VideoUrlInput from '@/components/VideoUrlInput';
 import { StudySession, createNewSession, deleteSession, getSavedSessions } from '@/lib/session';
 import { PlaylistInfo, VideoInfo } from '@/lib/youtube';
-import { BookOpen, Clock, Github, Play, Target, Trash2 } from 'lucide-react';
+import { BookOpen, Clock, Github, Play, Target, Trash2, Share2, Copy, Check } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 export default function Home() {
@@ -13,6 +13,9 @@ export default function Home() {
   const [sessionName, setSessionName] = useState('');
   const [sessionVideos, setSessionVideos] = useState<VideoInfo[]>([]);
   const [sessionPlaylists, setSessionPlaylists] = useState<PlaylistInfo[]>([]);
+  const [isSharing, setIsSharing] = useState(false);
+  const [shareLink, setShareLink] = useState<string | null>(null);
+  const [copySuccess, setCopySuccess] = useState(false);
 
   useEffect(() => {
     setSavedSessions(getSavedSessions());
@@ -56,6 +59,55 @@ export default function Home() {
     setSessionName('');
     setSessionVideos([]);
     setSessionPlaylists([]);
+    setShareLink(null);
+    setCopySuccess(false);
+  };
+
+  const handleShareSession = async () => {
+    if (sessionVideos.length === 0 && sessionPlaylists.length === 0) {
+      return;
+    }
+
+    setIsSharing(true);
+    
+    try {
+      const response = await fetch('/api/sessions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: sessionName.trim() || 'Shared Study Session',
+          videos: sessionVideos,
+          playlists: sessionPlaylists,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create shareable session');
+      }
+
+      const { sessionId } = await response.json();
+      const shareUrl = `${window.location.origin}/session/${sessionId}`;
+      setShareLink(shareUrl);
+    } catch (error) {
+      console.error('Error sharing session:', error);
+      alert('Failed to create shareable session. Please try again.');
+    } finally {
+      setIsSharing(false);
+    }
+  };
+
+  const copyShareLink = async () => {
+    if (!shareLink) return;
+    
+    try {
+      await navigator.clipboard.writeText(shareLink);
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+    } catch (error) {
+      console.error('Failed to copy link:', error);
+    }
   };
 
   const formatTime = (seconds: number) => {
@@ -150,23 +202,62 @@ export default function Home() {
                   </div>
                 )}
 
-                <div className="flex gap-2">
-                  <button
-                    onClick={createSession}
-                    disabled={!sessionName.trim() || totalVideos === 0}
-                    className="flex-1 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
-                  >
-                    <Play size={18} />
-                    Start Session
-                  </button>
-                  
-                  {(sessionVideos.length > 0 || sessionPlaylists.length > 0 || sessionName) && (
+                <div className="space-y-3">
+                  <div className="flex gap-2">
                     <button
-                      onClick={resetForm}
-                      className="px-4 py-2 border border-gray-600 text-gray-300 hover:text-white hover:border-gray-500 rounded-lg transition-colors"
+                      onClick={createSession}
+                      disabled={!sessionName.trim() || totalVideos === 0}
+                      className="flex-1 bg-blue-500 hover:bg-blue-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
                     >
-                      Reset
+                      <Play size={18} />
+                      Start Session
                     </button>
+                    
+                    <button
+                      onClick={handleShareSession}
+                      disabled={totalVideos === 0 || isSharing}
+                      className="bg-green-500 hover:bg-green-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium py-2 px-4 rounded-lg transition-colors flex items-center justify-center gap-2"
+                    >
+                      <Share2 size={18} />
+                      {isSharing ? 'Sharing...' : 'Share'}
+                    </button>
+                    
+                    {(sessionVideos.length > 0 || sessionPlaylists.length > 0 || sessionName) && (
+                      <button
+                        onClick={resetForm}
+                        className="px-4 py-2 border border-gray-600 text-gray-300 hover:text-white hover:border-gray-500 rounded-lg transition-colors"
+                      >
+                        Reset
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Share Link Display */}
+                  {shareLink && (
+                    <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4">
+                      <h4 className="text-green-400 font-medium mb-2 flex items-center gap-2">
+                        <Share2 size={16} />
+                        Session Shared Successfully!
+                      </h4>
+                      <p className="text-sm text-gray-300 mb-3">
+                        Anyone with this link can access your video collection (their progress tracking will be separate):
+                      </p>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={shareLink}
+                          readOnly
+                          className="flex-1 bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm text-gray-300 font-mono"
+                        />
+                        <button
+                          onClick={copyShareLink}
+                          className="bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded transition-colors flex items-center gap-2"
+                        >
+                          {copySuccess ? <Check size={16} /> : <Copy size={16} />}
+                          {copySuccess ? 'Copied!' : 'Copy'}
+                        </button>
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>

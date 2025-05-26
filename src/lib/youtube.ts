@@ -127,7 +127,7 @@ export async function parseYouTubeUrlsAsync(urls: string[]): Promise<{
         // Fetch real playlist data
         const [playlistDetails, playlistItems] = await Promise.all([
           youtubeAPI.fetchPlaylistDetails(playlistId),
-          youtubeAPI.fetchPlaylistItems(playlistId, 50) // Fetch up to 50 videos
+          youtubeAPI.fetchPlaylistItems(playlistId, 200) // Fetch up to 200 videos
         ]);
 
         if (playlistItems.length === 0) {

@@ -1,10 +1,18 @@
 'use client';
 
 import SessionView from '@/components/SessionView';
-import { StudySession, getSessionById } from '@/lib/session';
+import { StudySession, getSessionById, createNewSession } from '@/lib/session';
 import { ArrowLeft, ExternalLink } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
+
+interface SharedSession {
+  id: string;
+  name: string;
+  videos: any[];
+  playlists: any[];
+  createdAt: string;
+}
 
 export default function SharedSessionPage() {
   const params = useParams();
@@ -12,6 +20,7 @@ export default function SharedSessionPage() {
   const [session, setSession] = useState<StudySession | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isSharedSession, setIsSharedSession] = useState(false);
 
   useEffect(() => {
     const sessionId = params.id as string;
@@ -22,19 +31,47 @@ export default function SharedSessionPage() {
       return;
     }
 
-    try {
-      const foundSession = getSessionById(sessionId);
-      if (foundSession) {
-        setSession(foundSession);
-      } else {
-        setError('Session not found or may have expired');
+    const loadSession = async () => {
+      try {
+        // First try to load as a local session
+        const localSession = getSessionById(sessionId);
+        if (localSession) {
+          setSession(localSession);
+          setIsSharedSession(false);
+          setLoading(false);
+          return;
+        }
+
+        // If not found locally, try to load as a shared session from API
+        const response = await fetch(`/api/sessions?id=${sessionId}`);
+        if (response.ok) {
+          const sharedSession: SharedSession = await response.json();
+          
+          // Convert shared session to StudySession format for the viewer
+          const convertedSession = createNewSession(
+            sharedSession.name,
+            sharedSession.videos,
+            sharedSession.playlists
+          );
+          
+          // Override the ID to maintain the shared session reference
+          convertedSession.id = `shared-${sessionId}`;
+          setSession(convertedSession);
+          setIsSharedSession(true);
+        } else if (response.status === 404) {
+          setError('Session not found or may have expired');
+        } else {
+          setError('Failed to load shared session');
+        }
+      } catch (err) {
+        console.error('Error loading session:', err);
+        setError('Failed to load session');
+      } finally {
+        setLoading(false);
       }
-    } catch (err) {
-      console.error('Error loading session:', err);
-      setError('Failed to load session');
-    } finally {
-      setLoading(false);
-    }
+    };
+
+    loadSession();
   }, [params.id]);
 
   const handleUpdateSession = (updatedSession: StudySession) => {

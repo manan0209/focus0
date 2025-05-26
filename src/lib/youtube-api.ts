@@ -82,7 +82,7 @@ export class YouTubeAPI {
     }
   }
 
-  async fetchPlaylistItems(playlistId: string, maxResults = 50): Promise<YouTubeAPIPlaylistItem[]> {
+  async fetchPlaylistItems(playlistId: string, maxResults = 200): Promise<YouTubeAPIPlaylistItem[]> {
     try {
       const items: YouTubeAPIPlaylistItem[] = [];
       let nextPageToken = '';

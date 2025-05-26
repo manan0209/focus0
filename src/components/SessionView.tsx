@@ -2,7 +2,7 @@
 
 import { useWindowFocus } from '@/hooks/useWindowFocus';
 import { PomodoroSettings, saveSession, StudySession } from '@/lib/session';
-import { Clock, GripVertical, Home, Share2, Target } from 'lucide-react';
+import { Clock, GripVertical, X, Share2, Target, Play, Pause, SkipForward, SkipBack, Settings, MoreHorizontal, ChevronRight, Copy, Check, ExternalLink } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import UnifiedProgress from './UnifiedProgress';
 import VideoPlayer from './VideoPlayer';
@@ -16,9 +16,13 @@ interface SessionViewProps {
 export default function SessionView({ session, onUpdateSession, onExit }: SessionViewProps) {
   const [currentSession, setCurrentSession] = useState(session);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [shareLink, setShareLink] = useState<string | null>(null);
+  const [isSharing, setIsSharing] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(384); // Default 24rem = 384px
   const [isResizing, setIsResizing] = useState(false);
   const [isLargeScreen, setIsLargeScreen] = useState(false);
+  const [showQuickActions, setShowQuickActions] = useState(false);
   const resizeRef = useRef<HTMLDivElement>(null);
   const { isWindowFocused, totalFocusTime } = useWindowFocus();
 
@@ -148,18 +152,72 @@ export default function SessionView({ session, onUpdateSession, onExit }: Sessio
     }
   }, [allVideos, currentSession, updateSession]);
 
-  const shareSession = () => {
-    const shareUrl = `${window.location.origin}/session/${currentSession.id}`;
-    if (navigator.share) {
-      navigator.share({
-        title: `Focus0 Study Session: ${currentSession.name}`,
-        text: 'Join my focused study session!',
-        url: shareUrl
+  const shareSession = async () => {
+    if (isSharing) return;
+    
+    console.log('Starting share session...', {
+      name: currentSession.name,
+      videosCount: currentSession.videos.length,
+      playlistsCount: currentSession.playlists.length
+    });
+    
+    setIsSharing(true);
+    
+    try {
+      // Create shareable session via API
+      const response = await fetch('/api/sessions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: currentSession.name,
+          videos: currentSession.videos,
+          playlists: currentSession.playlists,
+        }),
       });
-    } else {
-      navigator.clipboard.writeText(shareUrl);
+
+      console.log('API Response status:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API Error:', errorText);
+        throw new Error(`Failed to create shareable session: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('API Success:', result);
+      
+      const { shareUrl } = result;
+      setShareLink(shareUrl);
+      
+      // Auto-copy to clipboard immediately
+      await navigator.clipboard.writeText(shareUrl);
+      setCopySuccess(true);
       setShowShareModal(true);
-      setTimeout(() => setShowShareModal(false), 3000);
+      
+      // Reset copy success after 3 seconds but keep modal open
+      setTimeout(() => {
+        setCopySuccess(false);
+      }, 3000);
+      
+    } catch (error) {
+      console.error('Error sharing session:', error);
+      alert(`Failed to share session: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsSharing(false);
+    }
+  };
+
+  const copyShareLink = async () => {
+    if (!shareLink) return;
+    
+    try {
+      await navigator.clipboard.writeText(shareLink);
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+    } catch (error) {
+      console.error('Failed to copy link:', error);
     }
   };
 
@@ -193,60 +251,114 @@ export default function SessionView({ session, onUpdateSession, onExit }: Sessio
 
   return (
     <div className="min-h-screen bg-gray-950 overflow-hidden">
-      {/* Header */}
-      <header className="bg-gray-900/90 backdrop-blur-sm border-b border-gray-700 px-4 sm:px-6 py-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 sm:gap-4">
-            <button
-              onClick={onExit}
-              className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
-            >
-              <Home size={20} />
-              <span className="hidden sm:inline">Exit Session</span>
-            </button>
-            
-            <div className="h-6 w-px bg-gray-600" />
-            
-            <div className="min-w-0">
-              <h1 className="text-sm sm:text-lg font-semibold text-white truncate">{currentSession.name}</h1>
-              <div className="flex items-center gap-2 sm:gap-4 text-xs text-gray-400">
-                <span className="flex items-center gap-1">
-                  <Clock size={12} />
-                  {formatTime(currentSession.totalStudyTime)}
-                </span>
-                <span className="flex items-center gap-1">
-                  <Target size={12} />
-                  {allVideos.length}
-                </span>
+      {/* Sleek Header */}
+      <header className="bg-gray-900/95 backdrop-blur-md border-b border-gray-700/50 shadow-lg">
+        <div className="px-4 sm:px-6 py-4">
+          <div className="flex items-center justify-between">
+            {/* Left Section - Logo & Session Info */}
+            <div className="flex items-center gap-4">
+              {/* Focus0 Logo */}
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                  <Target className="text-white" size={20} />
+                </div>
+                <div>
+                  <h1 className="text-xl font-bold text-white">Focus0</h1>
+                  <p className="text-xs text-gray-400">Study Session</p>
+                </div>
+              </div>
+              
+              <div className="h-8 w-px bg-gray-600" />
+              
+              {/* Session Name & Status */}
+              <div>
+                <h2 className="text-lg font-semibold text-white">{currentSession.name}</h2>
+                <div className="flex items-center gap-3 text-xs text-gray-400">
+                  <span className="flex items-center gap-1">
+                    <div className={`w-1.5 h-1.5 rounded-full ${
+                      isWindowFocused ? 'bg-green-400' : 'bg-yellow-400'
+                    }`} />
+                    {isWindowFocused ? 'Focused' : 'Unfocused'}
+                  </span>
+                  <span>Video {currentSession.currentVideoIndex + 1} of {allVideos.length}</span>
+                  <span>{formatTime(Math.floor(totalFocusTime / 1000))} focused</span>
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="flex items-center gap-2">
-            <span className="hidden lg:inline text-xs text-gray-500">
-              Made with ❤️ by{' '}
-              <a 
-                href="https://github.com/manan0209" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                className="text-blue-400 hover:text-blue-300 transition-colors"
+            {/* Center Section - Progress Dots */}
+            <div className="flex items-center gap-1">
+              {Array.from({ length: 10 }, (_, i) => {
+                const progressPercent = ((currentSession.currentVideoIndex + 1) / allVideos.length) * 100;
+                const dotThreshold = (i + 1) * 10;
+                
+                let dotColor = 'bg-gray-700'; // Not reached
+                if (progressPercent >= dotThreshold) {
+                  dotColor = 'bg-green-400'; // Complete
+                } else if (progressPercent > (dotThreshold - 10)) {
+                  dotColor = 'bg-yellow-400'; // In progress
+                }
+                
+                return (
+                  <div 
+                    key={i} 
+                    className={`w-2 h-2 rounded-full transition-colors ${dotColor}`}
+                    title={`${dotThreshold}% Progress`}
+                  />
+                );
+              })}
+            </div>
+
+            {/* Right Section - Action Buttons */}
+            <div className="flex items-center gap-3">
+              {/* Video Controls */}
+              <div className="hidden md:flex items-center gap-1 bg-gray-800/50 rounded-lg p-1">
+                <button
+                  onClick={() => handleVideoChange(Math.max(0, currentSession.currentVideoIndex - 1))}
+                  disabled={currentSession.currentVideoIndex === 0}
+                  className="p-1.5 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  title="Previous Video"
+                >
+                  <SkipBack size={14} />
+                </button>
+                
+                <button
+                  onClick={() => handleVideoChange(Math.min(allVideos.length - 1, currentSession.currentVideoIndex + 1))}
+                  disabled={currentSession.currentVideoIndex === allVideos.length - 1}
+                  className="p-1.5 text-gray-400 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  title="Next Video"
+                >
+                  <SkipForward size={14} />
+                </button>
+              </div>
+
+              {/* Share Button */}
+              <button
+                onClick={shareSession}
+                disabled={isSharing}
+                className="flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 disabled:bg-green-700 text-white rounded-lg transition-colors font-medium"
+                title="Share Session"
               >
-                devmnn
-              </a>
-            </span>
-            <button
-              onClick={shareSession}
-              className="flex items-center gap-2 px-3 py-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded transition-colors"
-            >
-              <Share2 size={16} />
-              <span className="hidden sm:inline">Share</span>
-            </button>
+                <Share2 size={16} />
+                <span className="hidden sm:inline">{isSharing ? 'Sharing...' : 'Share'}</span>
+              </button>
+
+              {/* Exit Button */}
+              <button
+                onClick={onExit}
+                className="flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors font-medium"
+                title="Exit Session"
+              >
+                <X size={16} />
+                <span className="hidden sm:inline">Exit</span>
+              </button>
+            </div>
           </div>
         </div>
       </header>
 
       {/* Main Layout - Resizable */}
-      <div className="flex h-[calc(100vh-73px)] relative">
+      <div className="flex h-[calc(100vh-88px)] relative">
         {/* Main Video Area */}
         <div 
           className={`flex-1 p-3 lg:p-4 xl:p-6 min-h-0 ${isLargeScreen ? 'pr-0' : ''}`}
@@ -412,10 +524,105 @@ export default function SessionView({ session, onUpdateSession, onExit }: Sessio
         )}
       </div>
 
-      {/* Share Modal */}
-      {showShareModal && (
-        <div className="fixed bottom-4 right-4 bg-green-500 text-white p-4 rounded-lg shadow-lg">
-          <p className="text-sm">Session link copied to clipboard! 📋</p>
+      {/* Enhanced Share Modal */}
+      {showShareModal && shareLink && (
+        <div 
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowShareModal(false);
+            }
+          }}
+        >
+          <div className="bg-gray-900 border border-gray-700 rounded-lg shadow-2xl max-w-md w-full">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-6 border-b border-gray-700">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center">
+                  <Share2 className="text-white" size={20} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-white">Session Shared!</h3>
+                  <p className="text-sm text-gray-400">Your session is ready to share</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowShareModal(false)}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 space-y-4">
+              {/* Success Message */}
+              <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-4">
+                <div className="flex items-center gap-3">
+                  <Check className="text-green-400" size={20} />
+                  <div>
+                    <p className="text-green-400 font-medium">Link copied to clipboard!</p>
+                    <p className="text-green-300/80 text-sm">Share this link with others to let them access your video collection</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Session Info */}
+              <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
+                <h4 className="text-white font-medium mb-2">{currentSession.name}</h4>
+                <div className="flex items-center gap-4 text-sm text-gray-400">
+                  <span>{currentSession.videos.length} videos</span>
+                  <span>{currentSession.playlists.length} playlists</span>
+                  <span>{allVideos.length} total videos</span>
+                </div>
+              </div>
+
+              {/* Share Link */}
+              <div className="space-y-3">
+                <label className="text-sm font-medium text-gray-300">Share Link</label>
+                <div className="flex gap-2">
+                  <div className="flex-1 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-300 font-mono break-all">
+                    {shareLink}
+                  </div>
+                  <button
+                    onClick={copyShareLink}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+                      copySuccess 
+                        ? 'bg-green-600 text-white' 
+                        : 'bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white'
+                    }`}
+                  >
+                    {copySuccess ? <Check size={16} /> : <Copy size={16} />}
+                    {copySuccess ? 'Copied!' : 'Copy'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Additional Actions */}
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => window.open(shareLink, '_blank')}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                >
+                  <ExternalLink size={16} />
+                  Preview Link
+                </button>
+                <button
+                  onClick={() => setShowShareModal(false)}
+                  className="flex-1 bg-gray-700 hover:bg-gray-600 text-gray-300 hover:text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+
+              {/* Info Note */}
+              <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+                <p className="text-xs text-blue-300">
+                  <strong>Note:</strong> Others can view your video collection, but their progress will be tracked separately. Sessions expire after 30 days.
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

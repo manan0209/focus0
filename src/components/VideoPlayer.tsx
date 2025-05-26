@@ -1,7 +1,7 @@
 'use client';
 
 import { VideoInfo } from '@/lib/youtube';
-import { Maximize, Minimize, Pause, Play, Settings, SkipBack, SkipForward, Subtitles, Volume2, VolumeX } from 'lucide-react';
+import { Maximize, Minimize, Pause, Play, Settings, SkipBack, SkipForward, Subtitles, Volume2, VolumeX, Monitor } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import YouTube, { YouTubeProps } from 'react-youtube';
 
@@ -31,7 +31,10 @@ export default function VideoPlayer({
   const [currentTime, setCurrentTime] = useState(0);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [showSpeedMenu, setShowSpeedMenu] = useState(false);
+  const [showQualityMenu, setShowQualityMenu] = useState(false);
   const [captionsEnabled, setCaptionsEnabled] = useState(false);
+  const [currentQuality, setCurrentQuality] = useState('auto');
+  const [availableQualities, setAvailableQualities] = useState<string[]>(['auto']);
   const [showControls, setShowControls] = useState(true);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -45,7 +48,7 @@ export default function VideoPlayer({
     height: '100%',
     width: '100%',
     playerVars: {
-      autoplay: 0,
+      autoplay: currentIndex > 0 ? 1 : 0, // Auto-play for subsequent videos in playlist
       controls: 0,
       disablekb: 1,
       fs: 0,
@@ -54,8 +57,26 @@ export default function VideoPlayer({
       rel: 0,
       showinfo: 0,
       enablejsapi: 1,
+      cc_load_policy: 0, // Don't auto-load captions - we'll control this
+      hl: 'en', // Interface language (English)
+      cc_lang_pref: 'en', // Preferred caption language (English)
+      cc_language: 'en', // Force English captions when available
+      playsinline: 1, // Play inline on mobile
       origin: typeof window !== 'undefined' ? window.location.origin : ''
     },
+  };
+
+  // Quality mapping for user-friendly display
+  const qualityMap: Record<string, string> = {
+    'auto': 'Auto',
+    'hd2160': '2160p',
+    'hd1440': '1440p',
+    'hd1080': '1080p',
+    'hd720': '720p',
+    'large': '480p',
+    'medium': '360p',
+    'small': '240p',
+    'tiny': '144p'
   };
 
   const onReady = useCallback((event: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -63,6 +84,43 @@ export default function VideoPlayer({
     const videoDuration = event.target.getDuration();
     setDuration(videoDuration);
     setIsLoading(false);
+    
+    // Get available quality levels
+    try {
+      const qualities = event.target.getAvailableQualityLevels();
+      console.log('Available qualities from YouTube:', qualities); // Debug log
+      
+      if (qualities && qualities.length > 0) {
+        // Include all available qualities, not just ones in our map
+        const allQualities = ['auto', ...qualities.filter((q: any) => q)]; // eslint-disable-line @typescript-eslint/no-explicit-any
+        setAvailableQualities(allQualities);
+        
+        // Set highest quality by default (first in the list after auto is usually highest)
+        const highestQuality = qualities[0]; // YouTube typically returns qualities in descending order
+        if (highestQuality && highestQuality !== 'auto') {
+          event.target.setPlaybackQuality(highestQuality);
+          setCurrentQuality(highestQuality);
+          console.log('Set to highest quality:', highestQuality);
+        } else {
+          setCurrentQuality(event.target.getPlaybackQuality() || 'auto');
+        }
+        console.log('Set available qualities:', allQualities); // Debug log
+      } else {
+        // Fallback qualities if API fails
+        setAvailableQualities(['auto', 'hd1080', 'hd720', 'large', 'medium']);
+        // Try to set 1080p as default
+        try {
+          event.target.setPlaybackQuality('hd1080');
+          setCurrentQuality('hd1080');
+        } catch (e) {
+          setCurrentQuality('auto');
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to get quality levels:', error);
+      // Fallback qualities if API fails
+      setAvailableQualities(['auto', 'hd1080', 'hd720', 'large', 'medium']);
+    }
     
     // Fetch video title from YouTube API
     if (onTitleUpdate && currentVideo) {
@@ -87,6 +145,7 @@ export default function VideoPlayer({
 
   const onEnd = useCallback(() => {
     setIsPlaying(false);
+    setIsLoading(true); // Show loading for next video
     onVideoEnd();
   }, [onVideoEnd]);
 
@@ -94,7 +153,20 @@ export default function VideoPlayer({
     const state = event.data;
     // YouTube player states: -1 (unstarted), 0 (ended), 1 (playing), 2 (paused), 3 (buffering), 5 (cued)
     setIsPlaying(state === 1);
-  }, []);
+    
+    // Update current quality when video state changes
+    if (playerRef.current && state === 1) { // When playing
+      setTimeout(() => {
+        if (playerRef.current) {
+          const actualQuality = playerRef.current.getPlaybackQuality();
+          if (actualQuality && actualQuality !== currentQuality) {
+            setCurrentQuality(actualQuality);
+            console.log(`Quality automatically updated to: ${actualQuality}`);
+          }
+        }
+      }, 1000);
+    }
+  }, [currentQuality]);
 
   // Update progress
   useEffect(() => {
@@ -131,29 +203,92 @@ export default function VideoPlayer({
     playerRef.current.setPlaybackRate(rate);
     setPlaybackRate(rate);
     setShowSpeedMenu(false);
+    setShowQualityMenu(false);
   }, []);
+
+  const changeQuality = useCallback((quality: string) => {
+    if (!playerRef.current) return;
+    
+    try {
+      console.log(`Attempting to change quality to: ${quality}`);
+      playerRef.current.setPlaybackQuality(quality);
+      setCurrentQuality(quality);
+      setShowQualityMenu(false);
+      setShowSpeedMenu(false);
+      
+      // Force quality change by reloading video if necessary
+      if (quality !== 'auto') {
+        const currentTime = playerRef.current.getCurrentTime();
+        playerRef.current.loadVideoById({
+          videoId: currentVideo.id,
+          startSeconds: currentTime,
+          suggestedQuality: quality
+        });
+      }
+      
+      // Update quality after a delay to confirm it was applied
+      setTimeout(() => {
+        if (playerRef.current) {
+          const actualQuality = playerRef.current.getPlaybackQuality();
+          console.log(`Quality after change: ${actualQuality}`);
+          // Only update if it's different and not auto-selected by YouTube
+          if (actualQuality) {
+            setCurrentQuality(actualQuality);
+          }
+        }
+      }, 2000);
+    } catch (error) {
+      console.warn('Failed to change quality:', error);
+    }
+  }, [currentVideo.id]);
 
   const toggleCaptions = useCallback(() => {
     if (!playerRef.current) return;
     
     try {
-      // Try to get available caption tracks
-      const captionTracks = playerRef.current.getOption('captions', 'tracklist');
-      if (captionTracks && captionTracks.length > 0) {
-        if (captionsEnabled) {
-          // Disable captions
-          playerRef.current.setOption('captions', 'track', {});
-        } else {
-          // Enable the first available caption track
-          playerRef.current.setOption('captions', 'track', captionTracks[0]);
+      if (captionsEnabled) {
+        // Disable captions
+        playerRef.current.setOption('captions', 'track', {});
+        console.log('Captions disabled');
+      } else {
+        // Enable captions - try multiple approaches
+        console.log('Attempting to enable captions...');
+        
+        // Method 1: Try to set English captions directly
+        try {
+          playerRef.current.setOption('captions', 'track', { 'languageCode': 'en' });
+        } catch (e) {
+          console.log('Direct English caption setting failed, trying alternatives...');
+          
+          // Method 2: Get available tracks and find English
+          const tracks = playerRef.current.getOption('captions', 'tracklist') || [];
+          console.log('Available caption tracks:', tracks);
+          
+          if (tracks.length > 0) {
+            // Look for English tracks first
+            let englishTrack = tracks.find((track: any) => { // eslint-disable-line @typescript-eslint/no-explicit-any
+              const lang = track.languageCode?.toLowerCase() || '';
+              const name = track.displayName?.toLowerCase() || '';
+              return lang.includes('en') || name.includes('english');
+            });
+            
+            // If no English track found, use the first available
+            const trackToUse = englishTrack || tracks[0];
+            playerRef.current.setOption('captions', 'track', trackToUse);
+            console.log('Set caption track:', trackToUse);
+          } else {
+            // Method 3: Force reload with captions if no tracks available
+            console.log('No tracks available, this video may not have captions');
+          }
         }
       }
-    } catch {
-      console.log('Caption control not available for this video');
+    } catch (error) {
+      console.warn('Caption toggle failed:', error);
     }
     
     setCaptionsEnabled(!captionsEnabled);
     setShowSpeedMenu(false);
+    setShowQualityMenu(false);
   }, [captionsEnabled]);
 
   const handleProgressClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
@@ -218,23 +353,28 @@ export default function VideoPlayer({
     resetControlsTimeout();
   }, [resetControlsTimeout]);
 
-  // Click outside handler for speed menu
+  // Click outside handler for menus
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Element;
+      
       if (showSpeedMenu && !target.closest('[data-speed-menu]') && !target.closest('[data-speed-button]')) {
         setShowSpeedMenu(false);
       }
+      
+      if (showQualityMenu && !target.closest('[data-quality-menu]') && !target.closest('[data-quality-button]')) {
+        setShowQualityMenu(false);
+      }
     };
 
-    if (showSpeedMenu) {
+    if (showSpeedMenu || showQualityMenu) {
       document.addEventListener('mousedown', handleClickOutside);
     }
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
-  }, [showSpeedMenu]);
+  }, [showSpeedMenu, showQualityMenu]);
 
   useEffect(() => {
     resetControlsTimeout();
@@ -343,6 +483,11 @@ export default function VideoPlayer({
           e.preventDefault();
           setShowKeyboardHelp(prev => !prev);
           break;
+        case 'q':
+          e.preventDefault();
+          setShowQualityMenu(prev => !prev);
+          setShowSpeedMenu(false);
+          break;
       }
     };
 
@@ -405,13 +550,6 @@ export default function VideoPlayer({
                 {currentIndex + 1} of {videos.length}
               </p>
             </div>
-            <button
-              onClick={toggleFullscreen}
-              className="text-white/80 hover:text-white transition-colors p-2"
-              title={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
-            >
-              {isFullscreen ? <Minimize size={20} /> : <Maximize size={20} />}
-            </button>
           </div>
         </div>
 
@@ -510,6 +648,35 @@ export default function VideoPlayer({
               >
                 <Subtitles size={20} />
               </button>
+
+              {/* Quality Control */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowQualityMenu(!showQualityMenu)}
+                  className="text-white/80 hover:text-white transition-colors p-2 flex items-center gap-1"
+                  title="Video quality"
+                  data-quality-button
+                >
+                  <Monitor size={16} />
+                  <span className="text-xs font-medium">{qualityMap[currentQuality] || currentQuality}</span>
+                </button>
+
+                {showQualityMenu && (
+                  <div className="absolute bottom-full right-0 mb-2 w-20 bg-black/90 backdrop-blur-sm rounded-lg shadow-lg overflow-hidden border border-white/20" data-quality-menu>
+                    {availableQualities.map(quality => (
+                      <button
+                        key={quality}
+                        onClick={() => changeQuality(quality)}
+                        className={`w-full text-left px-3 py-2 text-white text-xs hover:bg-white/10 transition-colors ${
+                          currentQuality === quality ? 'bg-blue-500/20 text-blue-400' : ''
+                        }`}
+                      >
+                        {qualityMap[quality] || quality}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
 
               {/* Speed Control */}
               <div className="relative">
