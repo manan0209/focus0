@@ -16,14 +16,14 @@ interface SharedSession {
 }
 
 // Function to reconstruct session from source URLs
-async function reconstructSessionFromSourceUrls(sessionId: string, sourceUrls: string[]): Promise<StudySession> {
+async function reconstructSessionFromSourceUrls(sessionId: string, sourceUrls: string[], sessionName?: string): Promise<StudySession> {
   try {
     // Use the existing parseYouTubeUrlsAsync function to process the URLs
     const result = await parseYouTubeUrlsAsync(sourceUrls);
     
     // Create session with reconstructed data
     const session = createNewSession(
-      'Shared Study Session',
+      sessionName || 'Shared Study Session',
       result.videos,
       result.playlists,
       sourceUrls
@@ -73,10 +73,12 @@ export default function SharedSessionPage() {
         if (sourcesParam) {
           // Handle source URL reconstruction
           const sourceUrls = sourcesParam.split('|').filter(url => url.trim());
+          const nameParam = urlParams.get('name');
+          const sessionName = nameParam ? decodeURIComponent(nameParam) : undefined;
           
           try {
             // Dynamically reconstruct the session from source URLs
-            const reconstructedSession = await reconstructSessionFromSourceUrls(sessionId, sourceUrls);
+            const reconstructedSession = await reconstructSessionFromSourceUrls(sessionId, sourceUrls, sessionName);
             setSession(reconstructedSession);
             setLoading(false);
             return;
