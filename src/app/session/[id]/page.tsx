@@ -1,7 +1,8 @@
 'use client';
 
 import SessionView from '@/components/SessionView';
-import { StudySession, getSessionById, createNewSession } from '@/lib/session';
+import { StudySession, createNewSession, getSessionById } from '@/lib/session';
+import { PlaylistInfo, VideoInfo } from '@/lib/youtube';
 import { ArrowLeft, ExternalLink } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -9,8 +10,8 @@ import { useEffect, useState } from 'react';
 interface SharedSession {
   id: string;
   name: string;
-  videos: any[];
-  playlists: any[];
+  videos: VideoInfo[];
+  playlists: PlaylistInfo[];
   createdAt: string;
 }
 
@@ -20,7 +21,6 @@ export default function SharedSessionPage() {
   const [session, setSession] = useState<StudySession | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isSharedSession, setIsSharedSession] = useState(false);
 
   useEffect(() => {
     const sessionId = params.id as string;
@@ -37,7 +37,6 @@ export default function SharedSessionPage() {
         const localSession = getSessionById(sessionId);
         if (localSession) {
           setSession(localSession);
-          setIsSharedSession(false);
           setLoading(false);
           return;
         }
@@ -57,7 +56,6 @@ export default function SharedSessionPage() {
           // Override the ID to maintain the shared session reference
           convertedSession.id = `shared-${sessionId}`;
           setSession(convertedSession);
-          setIsSharedSession(true);
         } else if (response.status === 404) {
           setError('Session not found or may have expired');
         } else {

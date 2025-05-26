@@ -1,3 +1,4 @@
+import { analytics } from '@/lib/analytics';
 import { PomodoroSettings } from '@/lib/session';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -21,21 +22,16 @@ export function usePomodoro(settings: PomodoroSettings) {
   });
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-
-  // Initialize audio for notifications
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      audioRef.current = new Audio('/sounds/notification.mp3');
-      audioRef.current.volume = 0.5;
-    }
-  }, []);
 
   const playNotification = useCallback(() => {
-    if (audioRef.current) {
-      audioRef.current.play().catch(console.error);
+    // Use browser notification API instead of audio
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification('Pomodoro Timer', {
+        body: state.phase === 'work' ? 'Break time!' : 'Work time!',
+        icon: '/favicon.ico'
+      });
     }
-  }, []);
+  }, [state.phase]);
 
   const getNextPhase = useCallback((currentPhase: PomodoroPhase, completedPomodoros: number): PomodoroPhase => {
     if (currentPhase === 'work') {
@@ -61,6 +57,12 @@ export function usePomodoro(settings: PomodoroSettings) {
   const startTimer = useCallback(() => {
     setState(prev => {
       const newPhase = prev.phase === 'idle' ? 'work' : prev.phase;
+      
+      // Track Pomodoro start for new sessions
+      if (prev.phase === 'idle') {
+        analytics.pomodoroStarted(settings.workDuration);
+      }
+      
       return {
         ...prev,
         phase: newPhase,
@@ -68,7 +70,7 @@ export function usePomodoro(settings: PomodoroSettings) {
         timeRemaining: prev.phase === 'idle' ? getPhaseDuration('work') : prev.timeRemaining
       };
     });
-  }, [getPhaseDuration]);
+  }, [getPhaseDuration, settings.workDuration]);
 
   const pauseTimer = useCallback(() => {
     setState(prev => ({ ...prev, isRunning: false }));
@@ -111,6 +113,10 @@ export function usePomodoro(settings: PomodoroSettings) {
           if (newTimeRemaining <= 0) {
             // Phase completed
             playNotification();
+            
+            // Track phase completion
+            analytics.pomodoroCompleted(prev.phase);
+            
             const nextPhase = getNextPhase(prev.phase, prev.completedPomodoros);
             const newCompletedPomodoros = prev.phase === 'work' 
               ? prev.completedPomodoros + 1 

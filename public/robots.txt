@@ -1,0 +1,27 @@
+User-agent: *
+Allow: /
+
+# Allow all crawlers to access all content
+# Sitemap location
+Sitemap: https://focus0.vercel.app/sitemap.xml
+
+# Crawl delay (optional, helps with server load)
+Crawl-delay: 1
+
+# Specific rules for common bots
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+User-agent: Slurp
+Allow: /
+
+# Block access to API routes for crawlers (optional)
+User-agent: *
+Disallow: /api/
+
+# Block access to internal files
+Disallow: /_next/
+Disallow: /favicon-generator.html

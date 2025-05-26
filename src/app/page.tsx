@@ -2,9 +2,10 @@
 
 import SessionView from '@/components/SessionView';
 import VideoUrlInput from '@/components/VideoUrlInput';
+import { analytics } from '@/lib/analytics';
 import { StudySession, createNewSession, deleteSession, getSavedSessions } from '@/lib/session';
 import { PlaylistInfo, VideoInfo } from '@/lib/youtube';
-import { BookOpen, Clock, Github, Play, Target, Trash2, Share2, Copy, Check } from 'lucide-react';
+import { BookOpen, Check, Clock, Copy, Github, Play, Share2, Target, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 export default function Home() {
@@ -24,6 +25,10 @@ export default function Home() {
   const handleVideosAdded = (videos: VideoInfo[], playlists: PlaylistInfo[]) => {
     setSessionVideos(prev => [...prev, ...videos]);
     setSessionPlaylists(prev => [...prev, ...playlists]);
+    
+    // Track video additions
+    videos.forEach(() => analytics.videoAdded('single'));
+    playlists.forEach(() => analytics.videoAdded('playlist'));
   };
 
   const createSession = () => {
@@ -33,10 +38,20 @@ export default function Home() {
 
     const session = createNewSession(sessionName.trim(), sessionVideos, sessionPlaylists);
     setCurrentSession(session);
+    
+    // Track session creation
+    analytics.sessionCreated(
+      sessionName.trim(), 
+      sessionVideos.length + sessionPlaylists.length
+    );
+    analytics.sessionStarted(session.id, session.name);
   };
 
   const loadSession = (session: StudySession) => {
     setCurrentSession(session);
+    
+    // Track session loading
+    analytics.sessionStarted(session.id, session.name);
   };
 
   const handleSessionUpdate = (updatedSession: StudySession) => {
@@ -314,8 +329,8 @@ export default function Home() {
                             <span>{totalVideos}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span>Focus Time:</span>
-                            <span>{formatTime(session.focusTime)}</span>
+                            <span>Total Time:</span>
+                            <span>{formatTime(session.totalStudyTime)}</span>
                           </div>
                         </div>
 

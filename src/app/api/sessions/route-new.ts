@@ -1,5 +1,5 @@
+import { PlaylistInfo, VideoInfo } from '@/lib/youtube';
 import { NextRequest, NextResponse } from 'next/server';
-import { VideoInfo, PlaylistInfo } from '@/lib/youtube';
 
 // Simplified session type - only stores video collections for sharing
 interface SharedSession {
@@ -35,11 +35,8 @@ function cleanupExpiredSessions() {
 }
 
 export async function POST(request: NextRequest) {
-  console.log('POST /api/sessions called');
-  
   try {
     const body = await request.json();
-    console.log('Request body:', body);
     
     const { name, videos, playlists } = body;
     
@@ -52,20 +49,33 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate video format
-    const isValidVideo = (video: any): video is VideoInfo => {
-      return video &&
-             typeof video.id === 'string' &&
-             typeof video.title === 'string' &&
-             typeof video.thumbnail === 'string';
+    const isValidVideo = (video: unknown): video is VideoInfo => {
+      return video !== null &&
+             typeof video === 'object' &&
+             video !== undefined &&
+             'id' in video &&
+             'title' in video &&
+             'thumbnail' in video &&
+             typeof (video as VideoInfo).id === 'string' &&
+             typeof (video as VideoInfo).title === 'string' &&
+             typeof (video as VideoInfo).thumbnail === 'string';
     };
 
     // Validate playlist format
-    const isValidPlaylist = (playlist: any): playlist is PlaylistInfo => {
-      return playlist &&
-             typeof playlist.id === 'string' &&
-             typeof playlist.title === 'string' &&
-             Array.isArray(playlist.videos) &&
-             playlist.videos.every(isValidVideo);
+    const isValidPlaylist = (playlist: unknown): playlist is PlaylistInfo => {
+      if (playlist === null || typeof playlist !== 'object' || playlist === undefined) {
+        return false;
+      }
+      
+      const playlistObj = playlist as Record<string, unknown>;
+      
+      return 'id' in playlistObj &&
+             'title' in playlistObj &&
+             'videos' in playlistObj &&
+             typeof playlistObj.id === 'string' &&
+             typeof playlistObj.title === 'string' &&
+             Array.isArray(playlistObj.videos) &&
+             playlistObj.videos.every(isValidVideo);
     };
 
     if (videos && !videos.every(isValidVideo)) {

@@ -62,10 +62,10 @@ Focus0 is a next-generation web application that transforms YouTube into a laser
 - Glass morphism effects and smooth animations
 - Accessible keyboard navigation
 
-### 🔊 Ambient Sound Support
-- Built-in ambient sound toggles (rain, forest, ocean)
-- Volume control for background sounds
-- Multiple sound layers for enhanced focus
+### 🔔 Smart Notifications
+- Browser-based notifications for Pomodoro phase transitions
+- Non-intrusive focus time alerts
+- Session completion notifications
 
 ## 🚀 Getting Started
 
@@ -127,6 +127,10 @@ For **real playlist content** instead of placeholder videos, configure the YouTu
 npm run build
 npm start
 ```
+
+### 🚀 Deployment
+
+For detailed deployment instructions including Vercel setup, environment variables, and troubleshooting, see our comprehensive [Deployment Guide](./DEPLOYMENT.md).
 
 ## 🛠️ Technical Stack
 

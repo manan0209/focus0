@@ -2,7 +2,7 @@
 
 import { useWindowFocus } from '@/hooks/useWindowFocus';
 import { PomodoroSettings, saveSession, StudySession } from '@/lib/session';
-import { Clock, GripVertical, X, Share2, Target, Play, Pause, SkipForward, SkipBack, Settings, MoreHorizontal, ChevronRight, Copy, Check, ExternalLink } from 'lucide-react';
+import { Check, Copy, ExternalLink, GripVertical, Share2, SkipBack, SkipForward, Target, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import UnifiedProgress from './UnifiedProgress';
 import VideoPlayer from './VideoPlayer';
@@ -22,7 +22,6 @@ export default function SessionView({ session, onUpdateSession, onExit }: Sessio
   const [sidebarWidth, setSidebarWidth] = useState(384); // Default 24rem = 384px
   const [isResizing, setIsResizing] = useState(false);
   const [isLargeScreen, setIsLargeScreen] = useState(false);
-  const [showQuickActions, setShowQuickActions] = useState(false);
   const resizeRef = useRef<HTMLDivElement>(null);
   const { isWindowFocused, totalFocusTime } = useWindowFocus();
 
@@ -155,12 +154,6 @@ export default function SessionView({ session, onUpdateSession, onExit }: Sessio
   const shareSession = async () => {
     if (isSharing) return;
     
-    console.log('Starting share session...', {
-      name: currentSession.name,
-      videosCount: currentSession.videos.length,
-      playlistsCount: currentSession.playlists.length
-    });
-    
     setIsSharing(true);
     
     try {
@@ -177,16 +170,12 @@ export default function SessionView({ session, onUpdateSession, onExit }: Sessio
         }),
       });
 
-      console.log('API Response status:', response.status);
       
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('API Error:', errorText);
         throw new Error(`Failed to create shareable session: ${response.status}`);
       }
 
       const result = await response.json();
-      console.log('API Success:', result);
       
       const { shareUrl } = result;
       setShareLink(shareUrl);
@@ -202,7 +191,6 @@ export default function SessionView({ session, onUpdateSession, onExit }: Sessio
       }, 3000);
       
     } catch (error) {
-      console.error('Error sharing session:', error);
       alert(`Failed to share session: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsSharing(false);
@@ -216,8 +204,8 @@ export default function SessionView({ session, onUpdateSession, onExit }: Sessio
       await navigator.clipboard.writeText(shareLink);
       setCopySuccess(true);
       setTimeout(() => setCopySuccess(false), 2000);
-    } catch (error) {
-      console.error('Failed to copy link:', error);
+    } catch {
+      // Silent fail for clipboard operations
     }
   };
 

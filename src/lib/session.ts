@@ -7,14 +7,6 @@ export interface PomodoroSettings {
   longBreakInterval: number; // after how many work sessions
 }
 
-export interface AmbientSound {
-  id: string;
-  name: string;
-  url: string;
-  enabled: boolean;
-  volume: number;
-}
-
 export interface StudySession {
   id: string;
   name: string;
@@ -24,7 +16,6 @@ export interface StudySession {
   currentVideoIndex: number;
   focusTime: number; // in seconds
   pomodoroSettings: PomodoroSettings;
-  ambientSounds: AmbientSound[];
   isActive: boolean;
   totalStudyTime: number; // in seconds
   completedPomodoros: number;
@@ -36,37 +27,6 @@ const DEFAULT_POMODORO_SETTINGS: PomodoroSettings = {
   longBreakDuration: 15,
   longBreakInterval: 4
 };
-
-const DEFAULT_AMBIENT_SOUNDS: AmbientSound[] = [
-  {
-    id: 'rain',
-    name: 'Rain',
-    url: '/sounds/rain.mp3',
-    enabled: false,
-    volume: 0.3
-  },
-  {
-    id: 'forest',
-    name: 'Forest',
-    url: '/sounds/forest.mp3',
-    enabled: false,
-    volume: 0.3
-  },
-  {
-    id: 'cafe',
-    name: 'Café',
-    url: '/sounds/cafe.mp3',
-    enabled: false,
-    volume: 0.3
-  },
-  {
-    id: 'waves',
-    name: 'Ocean Waves',
-    url: '/sounds/waves.mp3',
-    enabled: false,
-    volume: 0.3
-  }
-];
 
 export function createNewSession(
   name: string,
@@ -82,7 +42,6 @@ export function createNewSession(
     currentVideoIndex: 0,
     focusTime: 0,
     pomodoroSettings: { ...DEFAULT_POMODORO_SETTINGS },
-    ambientSounds: [...DEFAULT_AMBIENT_SOUNDS],
     isActive: false,
     totalStudyTime: 0,
     completedPomodoros: 0

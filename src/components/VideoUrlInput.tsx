@@ -61,8 +61,7 @@ export default function VideoUrlInput({ onVideosAdded, className = '' }: VideoUr
           setLoadingMessage('✅ Successfully loaded real playlist content!');
         }
       }
-    } catch (error) {
-      console.error('Error processing URLs:', error);
+    } catch {
       setErrors(['An error occurred while processing URLs. Please check your YouTube API key configuration.']);
     } finally {
       setIsProcessing(false);
@@ -81,8 +80,8 @@ export default function VideoUrlInput({ onVideosAdded, className = '' }: VideoUr
     try {
       const text = await navigator.clipboard.readText();
       setUrlInput(prev => prev ? `${prev}\n${text}` : text);
-    } catch (error) {
-      console.error('Failed to read clipboard:', error);
+    } catch {
+      // Silent fail for clipboard operations
     }
   };
 
@@ -103,7 +102,6 @@ export default function VideoUrlInput({ onVideosAdded, className = '' }: VideoUr
               value={urlInput}
               onChange={(e) => setUrlInput(e.target.value)}
               placeholder={`Paste YouTube video or playlist URLs here...
-
 Examples:
 https://youtube.com/watch?v=dQw4w9WgXcQ
 https://youtu.be/dQw4w9WgXcQ
@@ -187,15 +185,11 @@ https://youtube.com/playlist?list=PLrAXtmRdnEQy6nuLMHjMZU6NoQW2i1x71`}
         <h4 className="text-blue-400 font-medium text-sm mb-1">Supported formats:</h4>
         <ul className="text-blue-300 text-xs space-y-1">
           <li>• Individual videos: youtube.com/watch?v=... or youtu.be/...</li>
-          <li>• Playlists: youtube.com/playlist?list=... (requires YouTube API key)</li>
+          <li>• Playlists: youtube.com/playlist?list=...</li>
           <li>• Multiple URLs: One per line</li>
         </ul>
-        <div className="mt-2 pt-2 border-t border-blue-500/20">
-          <p className="text-blue-300 text-xs">
-            💡 <strong>Playlist Support:</strong> For real playlist content, add your YouTube API key to <code className="bg-blue-500/20 px-1 rounded">.env.local</code>
-          </p>
         </div>
       </div>
-    </div>
+
   );
 }
