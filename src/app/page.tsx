@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { StudySession, createNewSession, getSavedSessions, deleteSession } from '@/lib/session';
-import { VideoInfo, PlaylistInfo } from '@/lib/youtube';
-import VideoUrlInput from '@/components/VideoUrlInput';
 import SessionView from '@/components/SessionView';
-import { Play, Trash2, Clock, Target, BookOpen, Github } from 'lucide-react';
+import VideoUrlInput from '@/components/VideoUrlInput';
+import { StudySession, createNewSession, deleteSession, getSavedSessions } from '@/lib/session';
+import { PlaylistInfo, VideoInfo } from '@/lib/youtube';
+import { BookOpen, Clock, Github, Play, Target, Trash2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 export default function Home() {
   const [currentSession, setCurrentSession] = useState<StudySession | null>(null);

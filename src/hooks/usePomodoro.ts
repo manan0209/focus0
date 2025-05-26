@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
 import { PomodoroSettings } from '@/lib/session';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 export type PomodoroPhase = 'work' | 'shortBreak' | 'longBreak' | 'idle';
 

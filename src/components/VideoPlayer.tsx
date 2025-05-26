@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useCallback, useRef, useEffect } from 'react';
-import YouTube, { YouTubeProps } from 'react-youtube';
 import { VideoInfo } from '@/lib/youtube';
-import { Play, Pause, SkipForward, SkipBack, Volume2, VolumeX, Maximize, Minimize, Settings, Subtitles } from 'lucide-react';
+import { Maximize, Minimize, Pause, Play, Settings, SkipBack, SkipForward, Subtitles, Volume2, VolumeX } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import YouTube, { YouTubeProps } from 'react-youtube';
 
 interface VideoPlayerProps {
   videos: VideoInfo[];
@@ -134,7 +134,7 @@ export default function VideoPlayer({
           playerRef.current.setOption('captions', 'track', captionTracks[0]);
         }
       }
-    } catch (error) {
+    } catch {
       console.log('Caption control not available for this video');
     }
     
@@ -327,7 +327,7 @@ export default function VideoPlayer({
           break;
         case '?':
           e.preventDefault();
-          setShowKeyboardHelp(!showKeyboardHelp);
+          setShowKeyboardHelp(prev => !prev);
           break;
       }
     };
@@ -535,7 +535,7 @@ export default function VideoPlayer({
               </button>
               
               <button
-                onClick={() => setShowKeyboardHelp(!showKeyboardHelp)}
+                onClick={() => setShowKeyboardHelp(prev => !prev)}
                 className="text-white/80 hover:text-white transition-colors p-2"
                 title="Keyboard shortcuts (?)"
               >

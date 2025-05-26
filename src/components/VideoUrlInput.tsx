@@ -1,8 +1,8 @@
 'use client';
 
+import { parseYouTubeUrls, PlaylistInfo, VideoInfo } from '@/lib/youtube';
+import { AlertCircle, CheckCircle, Link, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
-import { parseYouTubeUrls, VideoInfo, PlaylistInfo } from '@/lib/youtube';
-import { Plus, Link, AlertCircle, CheckCircle, Trash2 } from 'lucide-react';
 
 interface VideoUrlInputProps {
   onVideosAdded: (videos: VideoInfo[], playlists: PlaylistInfo[]) => void;

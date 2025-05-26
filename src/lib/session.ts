@@ -1,4 +1,4 @@
-import { VideoInfo, PlaylistInfo } from './youtube';
+import { PlaylistInfo, VideoInfo } from './youtube';
 
 export interface PomodoroSettings {
   workDuration: number; // in minutes

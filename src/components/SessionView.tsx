@@ -1,12 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { StudySession, PomodoroSettings, saveSession } from '@/lib/session';
 import { useWindowFocus } from '@/hooks/useWindowFocus';
+import { PomodoroSettings, saveSession, StudySession } from '@/lib/session';
+import { Clock, Home, Share2, Target, GripVertical } from 'lucide-react';
+import { useCallback, useEffect, useState, useRef } from 'react';
+import UnifiedProgress from './UnifiedProgress';
 import VideoPlayer from './VideoPlayer';
-import FocusBar from './FocusBar';
-import PomodoroTimer from './PomodoroTimer';
-import { Share2, Home, Clock, Target } from 'lucide-react';
 
 interface SessionViewProps {
   session: StudySession;
@@ -17,6 +16,9 @@ interface SessionViewProps {
 export default function SessionView({ session, onUpdateSession, onExit }: SessionViewProps) {
   const [currentSession, setCurrentSession] = useState(session);
   const [showShareModal, setShowShareModal] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(384); // Default 24rem = 384px
+  const [isResizing, setIsResizing] = useState(false);
+  const resizeRef = useRef<HTMLDivElement>(null);
   const { isWindowFocused, totalFocusTime } = useWindowFocus();
 
   // Combine videos from individual videos and playlists
@@ -61,6 +63,75 @@ export default function SessionView({ session, onUpdateSession, onExit }: Sessio
   const handlePomodoroSettingsChange = useCallback((pomodoroSettings: PomodoroSettings) => {
     updateSession({ pomodoroSettings });
   }, [updateSession]);
+
+  // Resizable sidebar functionality
+  const startResize = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  }, []);
+
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing) return;
+      
+      const newWidth = window.innerWidth - e.clientX;
+      const minWidth = 280; // Minimum sidebar width
+      const maxWidth = Math.min(600, window.innerWidth * 0.4); // Max 40% of screen width
+      
+      setSidebarWidth(Math.max(minWidth, Math.min(maxWidth, newWidth)));
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+    };
+
+    if (isResizing) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizing]);
+
+  // Update video titles when player is ready
+  const handleVideoTitleUpdate = useCallback((title: string, videoIndex: number) => {
+    const updatedVideos = [...allVideos];
+    if (updatedVideos[videoIndex]) {
+      updatedVideos[videoIndex] = { ...updatedVideos[videoIndex], title };
+      
+      // Update session with new title
+      const videoIsFromMainList = videoIndex < currentSession.videos.length;
+      if (videoIsFromMainList) {
+        const updatedSessionVideos = [...currentSession.videos];
+        updatedSessionVideos[videoIndex] = updatedVideos[videoIndex];
+        updateSession({ videos: updatedSessionVideos });
+      } else {
+        // Video is from a playlist
+        const playlistVideoIndex = videoIndex - currentSession.videos.length;
+        let currentPlaylistIndex = 0;
+        let currentVideoCount = 0;
+        
+        for (const playlist of currentSession.playlists) {
+          if (currentVideoCount + playlist.videos.length > playlistVideoIndex) {
+            const videoIndexInPlaylist = playlistVideoIndex - currentVideoCount;
+            const updatedPlaylists = [...currentSession.playlists];
+            updatedPlaylists[currentPlaylistIndex].videos[videoIndexInPlaylist] = updatedVideos[videoIndex];
+            updateSession({ playlists: updatedPlaylists });
+            break;
+          }
+          currentVideoCount += playlist.videos.length;
+          currentPlaylistIndex++;
+        }
+      }
+    }
+  }, [allVideos, currentSession, updateSession]);
 
   const shareSession = () => {
     const shareUrl = `${window.location.origin}/session/${currentSession.id}`;
@@ -159,87 +230,171 @@ export default function SessionView({ session, onUpdateSession, onExit }: Sessio
         </div>
       </header>
 
-      {/* Main Layout - Responsive */}
-      <div className="flex flex-col xl:flex-row h-[calc(100vh-73px)]">
+      {/* Main Layout - Resizable */}
+      <div className="flex h-[calc(100vh-73px)] relative">
         {/* Main Video Area */}
-        <div className="flex-1 p-2 sm:p-3 lg:p-4 xl:p-6 min-h-0">
+        <div 
+          className="flex-1 p-3 lg:p-4 xl:p-6 min-h-0"
+          style={{ 
+            width: window.innerWidth > 1024 ? `calc(100% - ${sidebarWidth}px)` : '100%'
+          }}
+        >
           <VideoPlayer
             videos={allVideos}
             currentIndex={currentSession.currentVideoIndex}
             onVideoEnd={handleVideoEnd}
             onVideoChange={handleVideoChange}
-            className="w-full h-full min-h-[200px] sm:min-h-[300px] md:min-h-[400px] xl:min-h-0"
+            onTitleUpdate={handleVideoTitleUpdate}
+            className="w-full h-full min-h-[300px] lg:min-h-[400px]"
           />
         </div>
 
-        {/* Sidebar - Responsive */}
-        <div className="w-full xl:w-80 2xl:w-96 bg-gray-900/50 backdrop-blur-sm border-t xl:border-t-0 xl:border-l border-gray-700 p-2 sm:p-3 lg:p-4 space-y-2 sm:space-y-3 lg:space-y-4 overflow-y-auto max-h-[45vh] xl:max-h-none">
-          {/* Focus Bar */}
-          <FocusBar
-            isWindowFocused={isWindowFocused}
-            focusTime={Math.floor(totalFocusTime / 1000)}
-            sessionGoal={currentSession.pomodoroSettings.workDuration * 60}
-          />
+        {/* Desktop Sidebar with Resize Handle */}
+        {typeof window !== 'undefined' && window.innerWidth > 1024 && (
+          <>
+            {/* Resize Handle */}
+            <div
+              ref={resizeRef}
+              onMouseDown={startResize}
+              className={`w-1 bg-gray-600 hover:bg-gray-500 cursor-col-resize transition-colors ${
+                isResizing ? 'bg-blue-500' : ''
+              } flex items-center justify-center group`}
+              style={{ minHeight: '100%' }}
+            >
+              <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                <GripVertical size={16} className="text-gray-400" />
+              </div>
+            </div>
 
-          {/* Pomodoro Timer */}
-          <PomodoroTimer
-            settings={currentSession.pomodoroSettings}
-            onSettingsChange={handlePomodoroSettingsChange}
-          />
+            {/* Sidebar */}
+            <div 
+              className="bg-gray-900/50 backdrop-blur-sm border-l border-gray-700 overflow-y-auto"
+              style={{ 
+                width: `${sidebarWidth}px`,
+                minWidth: '280px',
+                maxWidth: '600px'
+              }}
+            >
+              <div className="p-4 space-y-4">
+                {/* Unified Progress (Focus + Timer) */}
+                <UnifiedProgress
+                  isWindowFocused={isWindowFocused}
+                  focusTime={Math.floor(totalFocusTime / 1000)}
+                  settings={currentSession.pomodoroSettings}
+                  onSettingsChange={handlePomodoroSettingsChange}
+                />
 
-          {/* Video Queue */}
-          <div className="bg-gray-900/95 backdrop-blur-sm border border-gray-700 rounded-lg p-4">
-            <h3 className="font-medium text-gray-200 mb-3 flex items-center gap-2">
-              <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-              Video Queue ({allVideos.length})
-            </h3>
-            
-            <div className="space-y-2 max-h-40 overflow-y-auto">
-              {allVideos.map((video, index) => (
-                <button
-                  key={`${video.id}-${index}`}
-                  onClick={() => handleVideoChange(index)}
-                  className={`w-full text-left p-2 rounded text-sm transition-colors ${
-                    index === currentSession.currentVideoIndex
-                      ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                      : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700/50'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs">#{index + 1}</span>
-                    <span className="truncate">
-                      {video.title || `Video ${index + 1}`}
-                    </span>
+                {/* Video Queue */}
+                <div className="bg-gray-900/95 backdrop-blur-sm border border-gray-700 rounded-lg p-4">
+                  <h3 className="font-medium text-gray-200 mb-3 flex items-center gap-2">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    Video Queue ({allVideos.length})
+                  </h3>
+                  
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {allVideos.map((video, index) => (
+                      <button
+                        key={`${video.id}-${index}`}
+                        onClick={() => handleVideoChange(index)}
+                        className={`w-full text-left p-3 rounded-lg text-sm transition-colors ${
+                          index === currentSession.currentVideoIndex
+                            ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                            : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700/50'
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <span className="text-xs bg-gray-700 px-2 py-1 rounded flex-shrink-0">
+                            #{index + 1}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <div className="font-medium text-sm truncate">
+                              {video.title || 'Loading title...'}
+                            </div>
+                            {video.duration && (
+                              <div className="text-xs text-gray-500 mt-1">
+                                {Math.floor(video.duration / 60)}:{(video.duration % 60).toString().padStart(2, '0')}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </button>
+                    ))}
                   </div>
-                </button>
-              ))}
-            </div>
-          </div>
+                </div>
 
-          {/* Session Stats */}
-          <div className="bg-gray-900/95 backdrop-blur-sm border border-gray-700 rounded-lg p-4">
-            <h3 className="font-medium text-gray-200 mb-3">Session Stats</h3>
-            
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-400">Focus Time:</span>
-                <span className="text-white">{formatTime(Math.floor(totalFocusTime / 1000))}</span>
+                {/* Session Stats */}
+                <div className="bg-gray-900/95 backdrop-blur-sm border border-gray-700 rounded-lg p-4">
+                  <h3 className="font-medium text-gray-200 mb-3">Session Stats</h3>
+                  
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Focus Time:</span>
+                      <span className="text-white">{formatTime(Math.floor(totalFocusTime / 1000))}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Total Time:</span>
+                      <span className="text-white">{formatTime(currentSession.totalStudyTime)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Videos Watched:</span>
+                      <span className="text-white">{currentSession.currentVideoIndex + 1} / {allVideos.length}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-400">Pomodoros:</span>
+                      <span className="text-white">{currentSession.completedPomodoros}</span>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Total Time:</span>
-                <span className="text-white">{formatTime(currentSession.totalStudyTime)}</span>
+            </div>
+          </>
+        )}
+
+        {/* Mobile Sidebar (Bottom Sheet Style) */}
+        {typeof window !== 'undefined' && window.innerWidth <= 1024 && (
+          <div className="fixed bottom-0 left-0 right-0 bg-gray-900/95 backdrop-blur-sm border-t border-gray-700 p-4 max-h-[50vh] overflow-y-auto">
+            <div className="flex gap-4 overflow-x-auto">
+              {/* Unified Progress (Focus + Timer) */}
+              <div className="flex-shrink-0 w-80">
+                <UnifiedProgress
+                  isWindowFocused={isWindowFocused}
+                  focusTime={Math.floor(totalFocusTime / 1000)}
+                  settings={currentSession.pomodoroSettings}
+                  onSettingsChange={handlePomodoroSettingsChange}
+                />
               </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Videos Watched:</span>
-                <span className="text-white">{currentSession.currentVideoIndex + 1} / {allVideos.length}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-400">Pomodoros:</span>
-                <span className="text-white">{currentSession.completedPomodoros}</span>
+
+              {/* Video Queue */}
+              <div className="flex-shrink-0 w-80 bg-gray-900/95 backdrop-blur-sm border border-gray-700 rounded-lg p-4">
+                <h3 className="font-medium text-gray-200 mb-3 flex items-center gap-2">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                  Queue ({allVideos.length})
+                </h3>
+                
+                <div className="space-y-2 max-h-32 overflow-y-auto">
+                  {allVideos.map((video, index) => (
+                    <button
+                      key={`${video.id}-${index}`}
+                      onClick={() => handleVideoChange(index)}
+                      className={`w-full text-left p-2 rounded text-sm transition-colors ${
+                        index === currentSession.currentVideoIndex
+                          ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                          : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700/50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs">#{index + 1}</span>
+                        <span className="truncate text-xs">
+                          {video.title || 'Loading...'}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Share Modal */}

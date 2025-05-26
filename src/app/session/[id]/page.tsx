@@ -1,10 +1,10 @@
 'use client';
 
+import SessionView from '@/components/SessionView';
+import { StudySession, getSessionById } from '@/lib/session';
+import { ArrowLeft, ExternalLink } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { StudySession, getSessionById } from '@/lib/session';
-import SessionView from '@/components/SessionView';
-import { ArrowLeft, ExternalLink } from 'lucide-react';
 
 export default function SharedSessionPage() {
   const params = useParams();
