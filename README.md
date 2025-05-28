@@ -182,11 +182,6 @@ We welcome contributions! Please check our [Feature Roadmap](./FEATURE_ROADMAP.m
 3. Make your changes and test thoroughly
 4. Submit a pull request with detailed description
 
-### Bug Reports & Feature Requests
-
-- 🐛 **Bug Reports**: [Create an issue](https://github.com/manan0209/focus0/issues)
-- 💡 **Feature Requests**: [Start a discussion](https://github.com/manan0209/focus0/discussions)
-
 ---
 
 **Made with ❤️ by [devmnn](https://github.com/manan0209)**
