@@ -4,7 +4,7 @@
 
 Focus0 is a next-generation web application that transforms YouTube into a laser-focused study tool, creating a distraction-free environment for watching educational content with built-in focus tracking and productivity features.
 
-## ✨ Latest Updates (v1.1)
+## ✨ Latest Updates (v2)
 
 ### 🎮 Enhanced Video Controls
 - **Playback Speed Control**: 8 speed options from 0.25x to 2x
@@ -25,8 +25,6 @@ Focus0 is a next-generation web application that transforms YouTube into a laser
 - **?**: Show keyboard shortcuts help
 
 ### 📱 Responsive Design
-- **MacBook Air 13" Optimized**: Perfect layout for smaller laptop screens
-- **Mobile-Friendly**: Responsive design works on all devices
 - **Adaptive Sidebar**: Sidebar stacks on mobile, side-by-side on desktop
 - **Smart Breakpoints**: Uses xl: breakpoints for better laptop compatibility
 
@@ -55,17 +53,6 @@ Focus0 is a next-generation web application that transforms YouTube into a laser
 - Create, save, and resume study sessions
 - Session sharing via unique URLs
 - Quick access to saved sessions
-
-### 🎨 Modern UI/UX
-- Beautiful dark mode interface
-- Responsive design for all screen sizes
-- Glass morphism effects and smooth animations
-- Accessible keyboard navigation
-
-### 🔔 Smart Notifications
-- Browser-based notifications for Pomodoro phase transitions
-- Non-intrusive focus time alerts
-- Session completion notifications
 
 ## 🚀 Getting Started
 
@@ -200,46 +187,6 @@ We welcome contributions! Please check our [Feature Roadmap](./FEATURE_ROADMAP.m
 - 🐛 **Bug Reports**: [Create an issue](https://github.com/manan0209/focus0/issues)
 - 💡 **Feature Requests**: [Start a discussion](https://github.com/manan0209/focus0/discussions)
 
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🙏 Acknowledgments
-
-- YouTube for providing the embedded player API
-- The Next.js team for the amazing framework
-- Tailwind CSS for the utility-first styling approach
-- Lucide React for the beautiful icons
-
 ---
 
 **Made with ❤️ by [devmnn](https://github.com/manan0209)**
-
-*Transform your YouTube learning experience with Focus0* 🎓✨
-
-1. **Enter YouTube URLs**: Paste YouTube video or playlist URLs in the input field
-2. **Session Name**: Give your session a descriptive name
-3. **Start Session**: Click "Start Study Session" to begin
-
-### During a Study Session
-
-- **Focus Bar**: Monitor your attention with the dynamic focus indicator
-- **Video Controls**: Use custom player controls or navigate between videos
-- **Pomodoro Timer**: Start work sessions with configurable break intervals
-- **Session Stats**: Track total study time, focus time, and completed videos
-
-### Sharing Sessions
-
-- Click the "Share" button in any active session
-- Copy the generated link to share with others
-- Shared sessions maintain all videos and settings
-
-### Managing Sessions
-
-- **Save Sessions**: Sessions auto-save to localStorage
-- **Resume Sessions**: Access saved sessions from the main page
-- **Delete Sessions**: Remove old sessions to keep your list clean
-
----
-
-**Built with ❤️ for focused learning**
