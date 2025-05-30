@@ -1,7 +1,7 @@
 'use client';
 
 import SessionView from '@/components/SessionView';
-import { StudySession, createNewSession, getSessionById } from '@/lib/session';
+import { createNewSession, getSessionById, StudySession } from '@/lib/session';
 import { parseYouTubeUrlsAsync, PlaylistInfo, VideoInfo } from '@/lib/youtube';
 import { ArrowLeft, ExternalLink } from 'lucide-react';
 import { useParams, useRouter } from 'next/navigation';

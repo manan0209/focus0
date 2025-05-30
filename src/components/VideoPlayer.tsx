@@ -13,6 +13,8 @@ interface VideoPlayerProps {
   onVideoChange: (index: number) => void;
   onTimeUpdate?: (currentTime: number, duration: number) => void;
   onTitleUpdate?: (title: string, videoIndex: number) => void;
+  onPlay?: () => void;
+  onPause?: () => void;
   className?: string;
 }
 
@@ -23,6 +25,8 @@ export default function VideoPlayer({
   onVideoChange,
   onTimeUpdate,
   onTitleUpdate,
+  onPlay: onPlayCallback,
+  onPause: onPauseCallback,
   className = ''
 }: VideoPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -134,11 +138,13 @@ export default function VideoPlayer({
 
   const onPlay = useCallback(() => {
     setIsPlaying(true);
-  }, []);
+    onPlayCallback?.();
+  }, [onPlayCallback]);
 
   const onPause = useCallback(() => {
     setIsPlaying(false);
-  }, []);
+    onPauseCallback?.();
+  }, [onPauseCallback]);
 
   const onEnd = useCallback(() => {
     setIsPlaying(false);
@@ -298,12 +304,87 @@ export default function VideoPlayer({
     setCurrentTime(newTime);
   }, [duration]);
 
+  // Test function to manually trigger seek - can be called from browser console
+  // @ts-expect-error - Adding debug function to window object for testing
+  window.testSeek = (seconds: number) => {
+    console.log('🧪 Manual test seek called with:', seconds);
+    handleSeek(seconds);
+  };
+
   const handleSeek = useCallback((seconds: number) => {
-    if (!playerRef.current) return;
+    console.log('🔍 handleSeek called with seconds:', seconds);
     
-    const newTime = Math.max(0, Math.min(duration, currentTime + seconds));
-    playerRef.current.seekTo(newTime);
-  }, [currentTime, duration]);
+    if (!playerRef.current) {
+      console.log('❌ No player ref available');
+      return;
+    }
+    
+    try {
+      // Check if player is ready
+      const playerState = playerRef.current.getPlayerState();
+      console.log('📺 Player state:', playerState, '(1=playing, 2=paused, 5=cued)');
+      
+      // YouTube player states: -1 (unstarted), 0 (ended), 1 (playing), 2 (paused), 3 (buffering), 5 (cued)
+      // Only allow seeking when video is ready (states 1, 2, or 5)
+      if (playerState !== 1 && playerState !== 2 && playerState !== 5) {
+        console.log('⚠️ Player not in seekable state, current state:', playerState);
+        return;
+      }
+      
+      // Get current time directly from YouTube player
+      const currentPlayerTime = playerRef.current.getCurrentTime() || 0;
+      const playerDuration = playerRef.current.getDuration() || 0;
+      
+      console.log('⏰ Current time:', currentPlayerTime.toFixed(2), 'Duration:', playerDuration.toFixed(2));
+      
+      // Don't seek if duration is 0 (video not loaded)
+      if (playerDuration === 0) {
+        console.log('❌ Video duration is 0, cannot seek');
+        return;
+      }
+      
+      // Calculate new time with bounds checking
+      const newTime = Math.max(0, Math.min(playerDuration, currentPlayerTime + seconds));
+      console.log('🎯 Seeking from', currentPlayerTime.toFixed(2), 'to', newTime.toFixed(2));
+      
+      // Try multiple seek methods
+      console.log('🔄 Attempting seekTo with time:', newTime);
+      
+      // Primary seek attempt
+      playerRef.current.seekTo(newTime);
+      
+      // Force update after a short delay to verify
+      setTimeout(() => {
+        if (playerRef.current) {
+          const actualTime = playerRef.current.getCurrentTime();
+          console.log('✅ Time after seek - Expected:', newTime.toFixed(2), 'Actual:', actualTime.toFixed(2));
+          setCurrentTime(actualTime);
+          
+          // If seek didn't work, try again
+          if (Math.abs(actualTime - newTime) > 1) {
+            console.log('🔄 Seek didn\'t work, trying again...');
+            playerRef.current.seekTo(newTime, true);
+          }
+        }
+      }, 300);
+      
+      console.log('✅ Seek command completed');
+    } catch (error) {
+      console.error('❌ Failed to seek video:', error);
+    }
+  }, []);
+
+  const previousVideo = useCallback(() => {
+    if (currentIndex > 0) {
+      onVideoChange(currentIndex - 1);
+    }
+  }, [currentIndex, onVideoChange]);
+
+  const nextVideo = useCallback(() => {
+    if (currentIndex < videos.length - 1) {
+      onVideoChange(currentIndex + 1);
+    }
+  }, [currentIndex, videos.length, onVideoChange]);
 
   const toggleFullscreen = useCallback(() => {
     if (!containerRef.current) return;
@@ -387,18 +468,6 @@ export default function VideoPlayer({
     setIsMuted(!isMuted);
   }, [isMuted]);
 
-  const previousVideo = useCallback(() => {
-    if (currentIndex > 0) {
-      onVideoChange(currentIndex - 1);
-    }
-  }, [currentIndex, onVideoChange]);
-
-  const nextVideo = useCallback(() => {
-    if (currentIndex < videos.length - 1) {
-      onVideoChange(currentIndex + 1);
-    }
-  }, [currentIndex, videos.length, onVideoChange]);
-
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
@@ -408,8 +477,13 @@ export default function VideoPlayer({
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Only handle shortcuts when video player is focused or in fullscreen
-      if (!isFullscreen && document.activeElement?.tagName === 'INPUT') return;
+      // Don't handle shortcuts when user is typing in an input field
+      const activeElement = document.activeElement as HTMLElement;
+      if (activeElement?.tagName === 'INPUT' || 
+          activeElement?.tagName === 'TEXTAREA' ||
+          activeElement?.contentEditable === 'true') {
+        return;
+      }
       
       switch (e.key.toLowerCase()) {
         case ' ':
@@ -419,10 +493,12 @@ export default function VideoPlayer({
           break;
         case 'arrowleft':
           e.preventDefault();
+          console.log('⬅️ Left arrow pressed - seeking backward 10s');
           handleSeek(-10);
           break;
         case 'arrowright':
           e.preventDefault();
+          console.log('➡️ Right arrow pressed - seeking forward 10s');
           handleSeek(10);
           break;
         case 'arrowup':

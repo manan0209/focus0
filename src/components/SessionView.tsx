@@ -23,8 +23,9 @@ export default function SessionView({ session, onUpdateSession, onExit }: Sessio
   const [sidebarWidth, setSidebarWidth] = useState(384); // Default 24rem = 384px
   const [isResizing, setIsResizing] = useState(false);
   const [isLargeScreen, setIsLargeScreen] = useState(false);
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const resizeRef = useRef<HTMLDivElement>(null);
-  const { isWindowFocused, totalFocusTime } = useWindowFocus();
+  const { isWindowFocused } = useWindowFocus();
 
   // Handle screen size changes
   useEffect(() => {
@@ -52,9 +53,9 @@ export default function SessionView({ session, onUpdateSession, onExit }: Sessio
     saveSession(updatedSession);
   }, [currentSession, onUpdateSession]);
 
-  // Update focus time periodically
+  // Update focus time periodically - only when window is focused AND video is playing
   useEffect(() => {
-    if (!isWindowFocused) return;
+    if (!isWindowFocused || !isVideoPlaying) return;
 
     const interval = setInterval(() => {
       updateSession({
@@ -64,7 +65,7 @@ export default function SessionView({ session, onUpdateSession, onExit }: Sessio
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isWindowFocused, currentSession.focusTime, currentSession.totalStudyTime, updateSession]);
+  }, [isWindowFocused, isVideoPlaying, currentSession.focusTime, currentSession.totalStudyTime, updateSession]);
 
   const handleVideoEnd = useCallback(() => {
     if (currentSession.currentVideoIndex < allVideos.length - 1) {
@@ -77,6 +78,14 @@ export default function SessionView({ session, onUpdateSession, onExit }: Sessio
   const handleVideoChange = useCallback((index: number) => {
     updateSession({ currentVideoIndex: index });
   }, [updateSession]);
+
+  const handleVideoPlay = useCallback(() => {
+    setIsVideoPlaying(true);
+  }, []);
+
+  const handleVideoPause = useCallback(() => {
+    setIsVideoPlaying(false);
+  }, []);
 
   const handlePomodoroSettingsChange = useCallback((pomodoroSettings: PomodoroSettings) => {
     updateSession({ pomodoroSettings });
@@ -305,12 +314,12 @@ export default function SessionView({ session, onUpdateSession, onExit }: Sessio
                 <div className="flex items-center gap-3 text-xs text-gray-400">
                   <span className="flex items-center gap-1">
                     <div className={`w-1.5 h-1.5 rounded-full ${
-                      isWindowFocused ? 'bg-green-400' : 'bg-yellow-400'
+                      isWindowFocused && isVideoPlaying ? 'bg-green-400' : 'bg-yellow-400'
                     }`} />
-                    {isWindowFocused ? 'Focused' : 'Unfocused'}
+                    {isWindowFocused && isVideoPlaying ? 'Focused' : 'Unfocused'}
                   </span>
                   <span>Video {currentSession.currentVideoIndex + 1} of {allVideos.length}</span>
-                  <span>{formatTime(Math.floor(totalFocusTime / 1000))} focused</span>
+                  <span>{formatTime(currentSession.focusTime)} focused</span>
                 </div>
               </div>
             </div>
@@ -401,6 +410,8 @@ export default function SessionView({ session, onUpdateSession, onExit }: Sessio
             onVideoEnd={handleVideoEnd}
             onVideoChange={handleVideoChange}
             onTitleUpdate={handleVideoTitleUpdate}
+            onPlay={handleVideoPlay}
+            onPause={handleVideoPause}
             className="w-full h-full min-h-[300px] lg:min-h-[400px]"
           />
         </div>
@@ -434,8 +445,8 @@ export default function SessionView({ session, onUpdateSession, onExit }: Sessio
               <div className="p-4 space-y-4">
                 {/* Unified Progress (Focus + Timer) */}
                 <UnifiedProgress
-                  isWindowFocused={isWindowFocused}
-                  focusTime={Math.floor(totalFocusTime / 1000)}
+                  isWindowFocused={isWindowFocused && isVideoPlaying}
+                  focusTime={currentSession.focusTime}
                   settings={currentSession.pomodoroSettings}
                   onSettingsChange={handlePomodoroSettingsChange}
                 />
@@ -485,7 +496,7 @@ export default function SessionView({ session, onUpdateSession, onExit }: Sessio
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-gray-400">Focus Time:</span>
-                      <span className="text-white">{formatTime(Math.floor(totalFocusTime / 1000))}</span>
+                      <span className="text-white">{formatTime(currentSession.focusTime)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-400">Total Time:</span>
@@ -513,8 +524,8 @@ export default function SessionView({ session, onUpdateSession, onExit }: Sessio
               {/* Unified Progress (Focus + Timer) */}
               <div className="flex-shrink-0 w-80">
                 <UnifiedProgress
-                  isWindowFocused={isWindowFocused}
-                  focusTime={Math.floor(totalFocusTime / 1000)}
+                  isWindowFocused={isWindowFocused && isVideoPlaying}
+                  focusTime={currentSession.focusTime}
                   settings={currentSession.pomodoroSettings}
                   onSettingsChange={handlePomodoroSettingsChange}
                 />
